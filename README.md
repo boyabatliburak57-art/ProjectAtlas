@@ -1,3 +1,3 @@
 # Project Atlas Documentation
 
-Bu depo Atlas teknik dokümantasyonunu içerir.123
+Bu depo Atlas teknik dokümantasyonunu içerir.
