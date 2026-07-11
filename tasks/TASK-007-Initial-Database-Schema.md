@@ -1,6 +1,6 @@
 # TASK-007 — Initial Database Schema
 
-**Durum:** PostgreSQL doğrulaması bekliyor
+**Durum:** Tamamlandı
 **Bağımlılık:** TASK-005
 
 ## Amaç
@@ -67,10 +67,12 @@ Migration ve constraint integration testlerini çalıştır.
 ## Tamamlanma notu
 
 - **Tarih:** 2026-07-12
-- **Durum:** PostgreSQL doğrulaması bekliyor
+- **Durum:** Tamamlandı
 - **Değişiklik:** Drizzle database paketi, sekiz tablo, current revision görünümü, migration,
   idempotent seed ve PostgreSQL integration testleri eklendi.
 - **Migration:** İki forward migration; sekiz tablo ve `current_price_bars` görünümü.
 - **Geri dönüş:** Compensating migration veya doğrulanmış backup/restore.
-- **Bilinen sınırlama:** Docker/PostgreSQL erişimi doğrulanana kadar integration testi bekliyor.
-- **Sonraki görev:** TASK-007 PostgreSQL integration doğrulaması; ardından TASK-008
+- **Doğrulama:** PostgreSQL 17.10 üzerinde temiz şema migration'ı, tekrar migration,
+  foreign key ve duplicate bar kısıtları ile idempotent seed integration testleri geçti.
+- **Bilinen sınırlama:** Yok.
+- **Sonraki görev:** TASK-008

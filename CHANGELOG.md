@@ -18,6 +18,11 @@
 - Instrument Master ve Market Data için sekiz tablo, current revision görünümü ve seed
 - Migration constraint integration testleri ve ADR-004 veri erişimi kararı
 
+### Doğrulandı
+
+- TASK-007 migration, foreign key, unique constraint ve idempotent seed senaryoları
+  PostgreSQL 17 üzerinde doğrulandı
+
 ## 0.2.0-engineering-baseline — 2026-07-11
 
 ### Eklendi

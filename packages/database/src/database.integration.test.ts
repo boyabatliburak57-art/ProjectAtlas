@@ -29,6 +29,7 @@ describe('initial PostgreSQL migration', () => {
 
   beforeAll(async () => {
     await pool.query('drop schema if exists public cascade');
+    await pool.query('drop schema if exists drizzle cascade');
     await pool.query('create schema public');
     await runMigrations(db);
     await runMigrations(db);
