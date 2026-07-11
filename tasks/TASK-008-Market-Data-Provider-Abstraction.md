@@ -1,6 +1,6 @@
 # TASK-008 — Market Data Provider Abstraction
 
-**Durum:** Hazır  
+**Durum:** Tamamlandı
 **Bağımlılık:** TASK-006, TASK-007
 
 ## Amaç
@@ -49,3 +49,18 @@ Market data provider abstraction, capabilities, normalized DTO'lar, error taxono
 Gerçek internet servisine bağlanma.
 Unit testlerle malformed data ve unsupported capability senaryolarını doğrula.
 ```
+
+## Tamamlanma notu
+
+- **Tarih:** 2026-07-12
+- **Durum:** Tamamlandı
+- **Değişiklik:** Capability ve normalize DTO sözleşmeleri, güvenli provider error
+  taxonomy, dış yanıt validation sınırı, code-based registry ve fake adapter eklendi.
+- **Güvenlik:** Adapter çıktısı `unknown` kabul edilir; normalize contract'a yalnızca Zod
+  doğrulamasından sonra alınır. Ham provider hata mesajı dışarı taşınmaz ve secret contract
+  alanı bulunmaz.
+- **Migration:** Yok.
+- **Test:** Fake instrument/bar, unsupported timeframe, malformed bar, registry resolution
+  ve ham hata gizleme senaryoları doğrulandı.
+- **Bilinen sınırlama:** Gerçek provider, credential ve ingest schedule kapsam dışıdır.
+- **Sonraki görev:** TASK-009

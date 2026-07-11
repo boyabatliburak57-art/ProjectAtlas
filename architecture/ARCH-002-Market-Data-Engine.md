@@ -65,6 +65,11 @@ Provider capability örnekleri:
 - pagination,
 - rate limits.
 
+İlk uygulama kararında ham adapter yanıtları `unknown` kabul edilir. Validation wrapper;
+capability, instrument ve bar şemalarını doğruladıktan sonra normalize edilmiş sözleşmeyi
+registry tüketicilerine açar. Registry provider code ile çözümleme yapar. Secret sözleşmede
+taşınmaz; ham upstream hata metni güvenli provider error taxonomy dışına çıkarılmaz.
+
 ## 6. Normalize edilmiş bar
 
 ```typescript

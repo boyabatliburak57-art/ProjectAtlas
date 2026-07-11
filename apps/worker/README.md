@@ -45,6 +45,19 @@ requested range gibi doğal idempotency anahtarından türetilmelidir.
 - Son denemeden sonra dead-letter queue'ya yalnızca güvenli metadata yazılır
 - Ham payload, hata mesajı ve stack dead-letter kaydına kopyalanmaz
 
+## Market data provider sınırı
+
+`src/market-data/providers` dış sağlayıcıları worker/domain akışından ayırır:
+
+- adapter çıktıları güvenilmeyen `unknown` veri olarak kabul edilir,
+- capability, instrument ve bar yanıtları Zod ile normalize edilip doğrulanır,
+- provider code registry üzerinden adapter'a çevrilir,
+- retry edilebilir ve edilemez hatalar güvenli provider error kodlarına dönüştürülür,
+- provider symbol yalnızca adapter/mapping sınırında kalır; internal instrument kimliği yerine
+  geçmez.
+
+Fake adapter yalnızca test ve sonraki ingest görevlerinin deterministik doğrulaması içindir.
+
 ## Kontroller
 
 ```bash
@@ -54,4 +67,4 @@ pnpm --filter worker test
 pnpm --filter worker build
 ```
 
-Bu scaffold provider, indikatör, scanner veya alarm iş mantığı içermez.
+Gerçek provider entegrasyonu, indikatör, scanner veya alarm iş mantığı bu kapsamda yer almaz.

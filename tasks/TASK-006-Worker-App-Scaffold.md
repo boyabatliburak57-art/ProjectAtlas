@@ -1,6 +1,6 @@
 # TASK-006 — Worker Application Scaffold
 
-**Durum:** Redis doğrulaması bekliyor
+**Durum:** Tamamlandı
 **Bağımlılık:** TASK-002, TASK-003
 
 ## Amaç
@@ -46,11 +46,11 @@ Gerçek market data veya scanner job'ı yazma.
 ## Tamamlanma notu
 
 - **Tarih:** 2026-07-11
-- **Durum:** Redis doğrulaması bekliyor
+- **Durum:** Tamamlandı
 - **Değişiklik:** BullMQ, Redis bağlantısı, queue standardı, heartbeat, retry,
   dead-letter metadata, JSON logging, graceful shutdown ve test altyapısı eklendi.
 - **Migration:** Yok.
-- **Bilinen sınırlama:** Docker Desktop başlamadığı için gerçek Redis bağlantısı, heartbeat
-  tüketimi ve SIGTERM kapanışı canlı doğrulanamadı. Heartbeat internal süreç kontrolüdür;
-  dış health endpointi yoktur.
-- **Sonraki görev:** TASK-006 Redis smoke doğrulaması; ardından TASK-007
+- **Doğrulama:** Redis 7 healthcheck ve `PONG`, worker bağlantısı, heartbeat tüketimi ve
+  derlenmiş worker sürecinin kontrollü kapanışı canlı ortamda doğrulandı.
+- **Bilinen sınırlama:** Heartbeat internal süreç kontrolüdür; dış health endpointi yoktur.
+- **Sonraki görev:** TASK-007

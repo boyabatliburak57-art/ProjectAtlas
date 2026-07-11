@@ -17,9 +17,12 @@
 - TASK-007 kapsamında Drizzle tabanlı ilk PostgreSQL şeması ve migration'lar
 - Instrument Master ve Market Data için sekiz tablo, current revision görünümü ve seed
 - Migration constraint integration testleri ve ADR-004 veri erişimi kararı
+- TASK-008 provider capability ve normalize instrument/bar sözleşmeleri
+- Güvenli provider error taxonomy, validation wrapper, registry ve fake provider adapter
 
 ### Doğrulandı
 
+- TASK-006 Redis bağlantısı, heartbeat tüketimi ve kontrollü worker kapanışı
 - TASK-007 migration, foreign key, unique constraint ve idempotent seed senaryoları
   PostgreSQL 17 üzerinde doğrulandı
 
