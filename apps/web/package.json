@@ -4,11 +4,34 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "next build",
+    "dev": "next dev",
     "lint": "eslint .",
+    "start": "next start",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@atlas/config": "workspace:*"
+    "@atlas/config": "workspace:*",
+    "@tailwindcss/postcss": "4.3.2",
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@types/node": "26.1.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.3",
+    "jsdom": "29.1.1",
+    "tailwindcss": "4.3.2",
+    "vitest": "4.1.10"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "5.101.2",
+    "clsx": "2.1.1",
+    "next": "16.2.10",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "tailwind-merge": "3.6.0",
+    "zod": "4.4.3"
   }
 }

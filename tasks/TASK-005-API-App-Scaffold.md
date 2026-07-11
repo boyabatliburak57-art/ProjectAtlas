@@ -1,6 +1,6 @@
 # TASK-005 — API Application Scaffold
 
-**Durum:** Hazır  
+**Durum:** Tamamlandı
 **Bağımlılık:** TASK-002, TASK-003
 
 ## Amaç
@@ -47,3 +47,13 @@ Health endpointleri, environment validation, structured logging, correlation id 
 Henüz business endpoint geliştirme.
 Testleri ve OpenAPI doğrulamasını çalıştır.
 ```
+
+## Tamamlanma notu
+
+- **Tarih:** 2026-07-11
+- **Durum:** Tamamlandı
+- **Değişiklik:** NestJS, health probe'ları, environment validation, JSON logging,
+  correlation id, global error filter, OpenAPI ve test altyapısı eklendi.
+- **Migration:** Yok.
+- **Bilinen sınırlama:** Readiness henüz PostgreSQL ve Redis bağlantısını kontrol etmiyor.
+- **Sonraki görev:** TASK-006

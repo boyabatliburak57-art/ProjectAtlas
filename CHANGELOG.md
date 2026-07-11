@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Eklendi
+
+- TASK-004 kapsamında Next.js App Router web uygulaması iskeleti
+- Tailwind CSS ve shadcn/ui kuruluma hazır frontend yapılandırması
+- TanStack Query provider, public environment doğrulaması ve Vitest temel testleri
+- TASK-005 kapsamında NestJS API uygulaması iskeleti
+- Liveness/readiness, OpenAPI, environment doğrulaması ve standart hata zarfı
+- Structured JSON logging ile request/correlation id altyapısı
+- Güvenlik advisory'si için patched PostCSS transitive dependency override'ı
+- TASK-006 kapsamında BullMQ worker uygulaması iskeleti
+- Sürümlü queue sözleşmeleri, heartbeat, retry ve dead-letter temeli
+- Redis fail-fast bağlantısı, structured logging ve graceful shutdown
+
 ## 0.2.0-engineering-baseline — 2026-07-11
 
 ### Eklendi

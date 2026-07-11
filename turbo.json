@@ -8,6 +8,10 @@
       "dependsOn": ["^lint"],
       "outputs": []
     },
+    "test": {
+      "dependsOn": ["^test"],
+      "outputs": []
+    },
     "typecheck": {
       "dependsOn": ["^typecheck"],
       "outputs": []

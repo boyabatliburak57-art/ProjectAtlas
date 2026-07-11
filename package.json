@@ -6,11 +6,17 @@
   "engines": {
     "node": "22.14.0"
   },
+  "pnpm": {
+    "overrides": {
+      "postcss": "8.5.16"
+    }
+  },
   "scripts": {
     "build": "turbo run build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "turbo run lint",
+    "test": "turbo run test",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {

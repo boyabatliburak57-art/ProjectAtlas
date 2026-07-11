@@ -2,13 +2,24 @@
   "name": "@atlas/worker",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
-    "build": "tsc --noEmit",
-    "lint": "eslint .",
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/main.ts",
+    "lint": "eslint src",
+    "start": "node dist/main.js",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@atlas/config": "workspace:*"
+    "@atlas/config": "workspace:*",
+    "@types/node": "26.1.1",
+    "tsx": "4.23.0",
+    "vitest": "4.1.10"
+  },
+  "dependencies": {
+    "bullmq": "5.80.1",
+    "dotenv": "17.4.2",
+    "zod": "4.4.3"
   }
 }

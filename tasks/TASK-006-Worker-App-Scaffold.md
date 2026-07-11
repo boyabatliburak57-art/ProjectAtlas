@@ -1,6 +1,6 @@
 # TASK-006 — Worker Application Scaffold
 
-**Durum:** Hazır  
+**Durum:** Redis doğrulaması bekliyor
 **Bağımlılık:** TASK-002, TASK-003
 
 ## Amaç
@@ -42,3 +42,15 @@ apps/worker içinde BullMQ tabanlı minimal worker iskeleti oluştur.
 Graceful shutdown, logging, retry standardı ve test altyapısını ekle.
 Gerçek market data veya scanner job'ı yazma.
 ```
+
+## Tamamlanma notu
+
+- **Tarih:** 2026-07-11
+- **Durum:** Redis doğrulaması bekliyor
+- **Değişiklik:** BullMQ, Redis bağlantısı, queue standardı, heartbeat, retry,
+  dead-letter metadata, JSON logging, graceful shutdown ve test altyapısı eklendi.
+- **Migration:** Yok.
+- **Bilinen sınırlama:** Docker Desktop başlamadığı için gerçek Redis bağlantısı, heartbeat
+  tüketimi ve SIGTERM kapanışı canlı doğrulanamadı. Heartbeat internal süreç kontrolüdür;
+  dış health endpointi yoktur.
+- **Sonraki görev:** TASK-006 Redis smoke doğrulaması; ardından TASK-007

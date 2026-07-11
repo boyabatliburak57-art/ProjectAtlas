@@ -42,6 +42,15 @@
 
 ## 4. İlk endpoint grupları
 
+### Health
+
+- `GET /health/live`
+- `GET /health/ready`
+
+Health probe'ları altyapı tarafından sürümden bağımsız tüketilebilmesi için `/api/v1`
+prefix'inin dışındadır. Swagger UI `/api/v1/docs`, OpenAPI JSON ise
+`/api/v1/openapi.json` üzerinden sunulur.
+
 ### Auth
 
 - `POST /api/v1/auth/register`
@@ -100,3 +109,10 @@ Limitler kullanıcı, IP, endpoint sınıfı ve plan bazında uygulanabilir. Lim
 ## 7. Sürümleme
 
 Kırıcı değişiklikler yeni major API sürümü gerektirir. Tarama AST ve indikatör tanımı ayrıca şema sürümü taşır.
+
+## 8. Request ve correlation id
+
+- İstemci güvenli formatta `x-request-id` ve `x-correlation-id` gönderebilir.
+- Eksik veya geçersiz değerler sunucu tarafından yeniden üretilir.
+- Her iki değer response header'larında döndürülür.
+- Standart hata yanıtı `requestId` taşır; production yanıtı stack trace içermez.

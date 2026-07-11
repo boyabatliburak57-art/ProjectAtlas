@@ -1,6 +1,6 @@
 # TASK-004 — Web Application Scaffold
 
-**Durum:** Hazır  
+**Durum:** Tamamlandı
 **Bağımlılık:** TASK-002
 
 ## Amaç
@@ -47,3 +47,13 @@ Henüz ürün ekranları geliştirme.
 Build, lint, typecheck ve temel testi çalıştır.
 Eklediğin bağımlılıkları gerekçeleriyle raporla.
 ```
+
+## Tamamlanma notu
+
+- **Tarih:** 2026-07-11
+- **Durum:** Tamamlandı
+- **Değişiklik:** Next.js App Router, Tailwind CSS, shadcn/ui hazırlığı, TanStack Query,
+  environment validation ve Vitest test altyapısı eklendi.
+- **Migration:** Yok.
+- **Bilinen sınırlama:** Gerçek ürün ekranları ve API health isteği kapsam dışı bırakıldı.
+- **Sonraki görev:** TASK-005
