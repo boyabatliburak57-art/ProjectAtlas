@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { InstrumentImportService } from './instrument-import-service';
 
 const instrumentImportJobDataSchema = z.strictObject({
+  correlationId: z.string().trim().min(1).max(128).optional(),
   providerCode: z
     .string()
     .min(1)
@@ -20,5 +21,9 @@ export function processInstrumentImportJob(
   job: Pick<Job, 'data'>,
   service: InstrumentImportService,
 ) {
-  return service.execute(instrumentImportJobDataSchema.parse(job.data));
+  const data = instrumentImportJobDataSchema.parse(job.data);
+  return service.execute({
+    providerCode: data.providerCode,
+    dryRun: data.dryRun,
+  });
 }

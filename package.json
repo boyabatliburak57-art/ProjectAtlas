@@ -4,7 +4,8 @@
   "private": true,
   "packageManager": "pnpm@9.15.4",
   "engines": {
-    "node": "22.14.0"
+    "node": "22.14.0",
+    "pnpm": "9.15.4"
   },
   "pnpm": {
     "overrides": {
@@ -16,11 +17,14 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "turbo run lint",
+    "preinstall": "node scripts/check-toolchain-versions.mjs --node-only",
     "secret:scan": "bash scripts/secret-scan.sh --all",
     "secret:scan:test": "bash scripts/test-secret-scan.sh",
     "test": "turbo run test",
     "test:adr-validator": "node --test scripts/validate-adr-identifiers.test.mjs",
+    "test:version-check": "node --test scripts/check-toolchain-versions.test.mjs",
     "validate:adr": "node scripts/validate-adr-identifiers.mjs",
+    "version:check": "node scripts/check-toolchain-versions.mjs",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {

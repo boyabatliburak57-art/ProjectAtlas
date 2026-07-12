@@ -1,4 +1,7 @@
 import type { JobsOptions } from 'bullmq';
+import { createHash } from 'node:crypto';
+
+import type { BarIngestionJobData } from '../market-data/bars/bar-ingestion-job';
 
 export const QUEUE_NAMES = {
   deadLetter: 'atlas.system.dead-letter.v1',
@@ -30,4 +33,28 @@ export function createHeartbeatJobId(
 ): string {
   const bucket = Math.floor(timestampMs / intervalMs);
   return `worker-heartbeat-${bucket}`;
+}
+
+function stableJobId(prefix: string, parts: readonly string[]): string {
+  const digest = createHash('sha256')
+    .update(parts.join('\u0000'))
+    .digest('hex');
+  return `${prefix}-${digest.slice(0, 32)}`;
+}
+
+export function createInstrumentSyncJobId(
+  providerCode: string,
+  idempotencyKey: string,
+): string {
+  return stableJobId('instrument-sync', [providerCode, idempotencyKey]);
+}
+
+export function createBarIngestionJobId(data: BarIngestionJobData): string {
+  return stableJobId('bar-ingestion', [
+    data.providerCode,
+    data.providerSymbol,
+    data.timeframe,
+    data.from,
+    data.to,
+  ]);
 }

@@ -5,8 +5,22 @@ Bu ortam yalnızca yerel geliştirme içindir. PostgreSQL ve Redis host üzerind
 
 ## Gereksinimler
 
+- Node.js `22.14.0`
+- Corepack ile pnpm `9.15.4`
 - Docker Engine veya Docker Desktop
 - Docker Compose
+
+Repository `.nvmrc`, `.node-version`, `package.json#engines` ve `packageManager` alanlarında aynı
+Node/pnpm hedefini kullanır. Kurulumdan önce:
+
+```bash
+nvm use
+corepack enable
+corepack prepare pnpm@9.15.4 --activate
+pnpm version:check
+```
+
+Yanlış Node sürümünde version check ve `pnpm install` başarısız olur.
 
 ## İlk kurulum
 
@@ -36,6 +50,18 @@ redis://127.0.0.1:6379
 ```
 
 Portlar `.env` içindeki `POSTGRES_PORT` ve `REDIS_PORT` değerleriyle değiştirilebilir.
+
+## Market-data worker
+
+Market-data işleri `atlas.market-data.v1` kuyruğunda çalışır. Worker başlangıcında
+instrument import ve OHLCV ingestion processor'ları PostgreSQL repository'leriyle
+compose edilir. Bu aşamada yalnızca boş fixture'lara sahip `fake-provider` adapter'ı
+kayıtlıdır; ticari provider ve cron schedule bulunmaz.
+
+Producer'lar job isimlerini ve deterministik idempotency job ID'lerini
+`apps/worker/src/queue` altındaki merkezi sözleşmelerden kullanmalıdır. Provider
+rate-limit, timeout ve unavailable hataları retry edilir; doğrulama, unsupported
+timeframe, mapping/authentication ve bilinmeyen job hataları retry edilmez.
 
 ## Sağlık kontrolü
 

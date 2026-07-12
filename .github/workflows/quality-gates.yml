@@ -1,0 +1,53 @@
+name: Quality Gates
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Node 22.14.0 Validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:3001/api/v1
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pinned Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Activate pinned pnpm with Corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.4 --activate
+
+      - name: Verify toolchain versions
+        run: pnpm version:check
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm exec turbo run lint --force
+
+      - name: Typecheck
+        run: pnpm exec turbo run typecheck --force
+
+      - name: Test
+        run: pnpm exec turbo run test --force
+
+      - name: Build
+        run: pnpm exec turbo run build --force

@@ -305,3 +305,22 @@ Markdown linkleri ve test skip/only kullanımı shell komutlarıyla kontrol edil
    tamamlanmalı ya da görev kapsamının handler-only olduğu açıkça belgelenmelidir.
 
 İkinci auditte bu maddeler yeniden doğrulanmadan Foundation milestone kapatılmamalıdır.
+
+## 17. TASK-011D remediation kanıtı
+
+Bu bölüm ilk NO-GO kararını değiştirmez; TASK-011F re-audit için toolchain kanıtı sağlar.
+
+| Alan            | Değer                                      |
+| --------------- | ------------------------------------------ |
+| Tarih           | 2026-07-12                                 |
+| İşletim sistemi | macOS 26.5.1 arm64                         |
+| Commit SHA      | `21dd6e6ccc28d9770a5828d9a7974755ecc03edd` |
+| Node            | `22.14.0`                                  |
+| pnpm            | `9.15.4`                                   |
+| Corepack        | `0.31.0`                                   |
+| Docker          | `29.6.1` (`8900f1d`)                       |
+
+Node 22.14.0 altında frozen install, version check, format, cache dışı lint/typecheck/test/build,
+database integration, worker integration, OpenAPI, ADR validation, secret scan ve production
+dependency audit başarılıdır. İlk auditteki Node 25.8.1 sapması TASK-011D kapsamında kapatılmıştır;
+milestone geçiş kararı TASK-011F sonucuna bağlıdır.

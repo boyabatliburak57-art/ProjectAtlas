@@ -8,7 +8,14 @@ const redisUrlSchema = z.url().refine(
   { message: 'REDIS_URL must use redis or rediss protocol' },
 );
 
+const databaseUrlSchema = z
+  .url()
+  .refine((value) => new URL(value).protocol === 'postgresql:', {
+    message: 'DATABASE_URL must use postgresql protocol',
+  });
+
 const environmentSchema = z.object({
+  DATABASE_URL: databaseUrlSchema,
   REDIS_URL: redisUrlSchema,
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(2),
   WORKER_HEARTBEAT_INTERVAL_MS: z.coerce

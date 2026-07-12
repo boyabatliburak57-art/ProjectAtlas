@@ -1,9 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
-import { Job, Queue, Worker } from 'bullmq';
+import { Job, Queue, UnrecoverableError, Worker } from 'bullmq';
 
 import type { WorkerEnvironment } from '../config/environment';
 import { processHeartbeat } from '../heartbeat/heartbeat';
+import {
+  createDefaultMarketDataComposition,
+  type MarketDataComposition,
+} from '../market-data/market-data-composition';
 import type { StructuredLogger } from '../observability/structured-logger';
 import {
   createHeartbeatJobId,
@@ -33,14 +37,18 @@ export class WorkerRuntime {
     private readonly environment: WorkerEnvironment,
     private readonly logger: StructuredLogger,
     private readonly systemQueue: Queue,
+    private readonly marketDataQueue: Queue,
     private readonly deadLetterQueue: Queue<DeadLetterData>,
-    private readonly worker: Worker,
+    private readonly systemWorker: Worker,
+    private readonly marketDataWorker: Worker,
+    private readonly marketDataComposition: MarketDataComposition,
     private readonly workerId: string,
   ) {}
 
   static async start(
     environment: WorkerEnvironment,
     logger: StructuredLogger,
+    injectedComposition?: MarketDataComposition,
   ): Promise<WorkerRuntime> {
     const connection = createRedisConnection(environment.REDIS_URL);
     const systemQueue = new Queue(QUEUE_NAMES.system, {
@@ -51,7 +59,11 @@ export class WorkerRuntime {
       connection,
       defaultJobOptions: DEFAULT_JOB_OPTIONS,
     });
-    const worker = new Worker(
+    const marketDataQueue = new Queue(QUEUE_NAMES.marketData, {
+      connection,
+      defaultJobOptions: DEFAULT_JOB_OPTIONS,
+    });
+    const systemWorker = new Worker(
       QUEUE_NAMES.system,
       (job) => {
         if (job.name !== JOB_NAMES.heartbeat) {
@@ -65,12 +77,26 @@ export class WorkerRuntime {
         connection,
       },
     );
+    const marketDataComposition =
+      injectedComposition ??
+      createDefaultMarketDataComposition(environment.DATABASE_URL, logger);
+    const marketDataWorker = new Worker(
+      QUEUE_NAMES.marketData,
+      (job) => marketDataComposition.process(job),
+      {
+        concurrency: environment.WORKER_CONCURRENCY,
+        connection,
+      },
+    );
     const runtime = new WorkerRuntime(
       environment,
       logger,
       systemQueue,
+      marketDataQueue,
       deadLetterQueue,
-      worker,
+      systemWorker,
+      marketDataWorker,
+      marketDataComposition,
       randomUUID(),
     );
 
@@ -82,7 +108,7 @@ export class WorkerRuntime {
       runtime.startHeartbeat();
       logger.info('worker.ready', {
         concurrency: environment.WORKER_CONCURRENCY,
-        queue: QUEUE_NAMES.system,
+        queues: [QUEUE_NAMES.system, QUEUE_NAMES.marketData],
       });
       return runtime;
     } catch (error: unknown) {
@@ -104,7 +130,10 @@ export class WorkerRuntime {
     }
 
     this.logger.info('worker.stopping', { reason });
-    await this.worker.pause(false);
+    await Promise.all([
+      this.systemWorker.pause(false),
+      this.marketDataWorker.pause(false),
+    ]);
     await this.closeConnections();
     this.logger.info('worker.stopped', { reason });
   }
@@ -122,8 +151,10 @@ export class WorkerRuntime {
       await Promise.race([
         Promise.all([
           this.systemQueue.waitUntilReady(),
+          this.marketDataQueue.waitUntilReady(),
           this.deadLetterQueue.waitUntilReady(),
-          this.worker.waitUntilReady(),
+          this.systemWorker.waitUntilReady(),
+          this.marketDataWorker.waitUntilReady(),
         ]),
         timeoutPromise,
       ]);
@@ -159,46 +190,58 @@ export class WorkerRuntime {
   }
 
   private registerWorkerEvents(): void {
-    this.systemQueue.on('error', (error) => {
+    this.registerQueueError(this.systemQueue, QUEUE_NAMES.system);
+    this.registerQueueError(this.marketDataQueue, QUEUE_NAMES.marketData);
+    this.registerQueueError(this.deadLetterQueue, QUEUE_NAMES.deadLetter);
+    this.registerJobEvents(this.systemWorker, QUEUE_NAMES.system);
+    this.registerJobEvents(this.marketDataWorker, QUEUE_NAMES.marketData);
+  }
+
+  private registerQueueError(queue: Queue, queueName: string): void {
+    queue.on('error', (error) => {
       this.logger.error('worker.queue.connection.error', {
         errorType: error.constructor.name,
-        queue: QUEUE_NAMES.system,
+        queue: queueName,
       });
     });
-    this.deadLetterQueue.on('error', (error) => {
-      this.logger.error('worker.queue.connection.error', {
-        errorType: error.constructor.name,
-        queue: QUEUE_NAMES.deadLetter,
-      });
-    });
-    this.worker.on('completed', (job) => {
+  }
+
+  private registerJobEvents(worker: Worker, queueName: string): void {
+    worker.on('completed', (job) => {
       this.logger.debug('worker.job.completed', {
         jobId: job.id,
         jobName: job.name,
-        queue: QUEUE_NAMES.system,
+        queue: queueName,
       });
     });
-    this.worker.on('error', (error) => {
+    worker.on('error', (error) => {
       this.logger.error('worker.connection.error', {
         errorType: error.constructor.name,
-        queue: QUEUE_NAMES.system,
+        queue: queueName,
       });
     });
-    this.worker.on('failed', (job, error) => {
+    worker.on('failed', (job, error) => {
       if (job === undefined) {
         return;
       }
 
       const attempts = job.opts.attempts ?? 1;
-      if (job.attemptsMade < attempts) {
+      if (
+        !(error instanceof UnrecoverableError) &&
+        job.attemptsMade < attempts
+      ) {
         return;
       }
 
-      void this.moveToDeadLetter(job, error);
+      void this.moveToDeadLetter(job, error, queueName);
     });
   }
 
-  private async moveToDeadLetter(job: Job, error: Error): Promise<void> {
+  private async moveToDeadLetter(
+    job: Job,
+    error: Error,
+    queueName: string,
+  ): Promise<void> {
     const jobId = job.id ?? 'job-id-unavailable';
 
     try {
@@ -209,7 +252,7 @@ export class WorkerRuntime {
           failedAt: new Date().toISOString(),
           jobId,
           jobName: job.name,
-          queueName: QUEUE_NAMES.system,
+          queueName,
         },
         { jobId: `dead-letter-${jobId}-${job.attemptsMade}` },
       );
@@ -217,7 +260,7 @@ export class WorkerRuntime {
         errorType: error.constructor.name,
         jobId,
         jobName: job.name,
-        queue: QUEUE_NAMES.system,
+        queue: queueName,
       });
     } catch (deadLetterError: unknown) {
       this.logger.error('worker.dead-letter.enqueue-failed', {
@@ -233,9 +276,12 @@ export class WorkerRuntime {
 
   private async closeConnections(): Promise<void> {
     await Promise.allSettled([
-      this.worker.close(),
+      this.systemWorker.close(),
+      this.marketDataWorker.close(),
       this.systemQueue.close(),
+      this.marketDataQueue.close(),
       this.deadLetterQueue.close(),
+      this.marketDataComposition.close(),
     ]);
   }
 }

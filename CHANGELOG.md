@@ -22,6 +22,8 @@
 - ADR dosya adı, başlığı, resmî indeks ve manifest referansları benzersiz kimlikle hizalandı.
 - Gitleaks v8.30.1 local çalışma ağacı/Git geçmişi scan'i ve fail-closed CI kapısı eklendi.
 - Synthetic detection testi ve merkezi suppression politikası belgelendi.
+- Node 22.14.0 ve pnpm 9.15.4 local/CI toolchain kaynakları hizalandı.
+- Fail-fast version checker, Corepack politikası ve Node 22 quality-gates workflow'u eklendi.
 
 ## 0.3.0-indicator-scanner-core — 2026-07-11
 
