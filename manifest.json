@@ -3,7 +3,7 @@
   "version": "0.3.1-foundation-remediation",
   "generated_at": "2026-07-11",
   "cumulative": true,
-  "file_count": 69,
+  "file_count": 70,
   "files": [
     "ATLAS_INDEX.md",
     "CHANGELOG.md",
@@ -41,6 +41,7 @@
     "docs/DOC-010-Quality-Gates-and-Toolchain-Policy.md",
     "guides/GITHUB_SETUP.md",
     "guides/INDICATOR_FIXTURE_GUIDE.md",
+    "guides/SECRET_SCANNING.md",
     "guides/T3_CODE_EXECUTION_CHECKLIST.md",
     "guides/T3_CODE_INTEGRATION.md",
     "manifest.json",

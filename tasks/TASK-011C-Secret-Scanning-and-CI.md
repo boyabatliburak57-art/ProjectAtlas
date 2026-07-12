@@ -1,6 +1,6 @@
 # TASK-011C — Secret Scanning and CI Gate
 
-**Durum:** Hazır  
+**Durum:** Tamamlandı
 **Bağımlılık:** TASK-011B
 
 ## Amaç
@@ -49,3 +49,15 @@ Gerçek secret kullanmadan synthetic detection testi ekle.
 Mevcut repository ve mümkünse git geçmişini tara.
 Bulguları raporla; secret değerlerini çıktıda gösterme.
 ```
+
+## Tamamlanma notu
+
+- **Tarih:** 2026-07-12
+- **Durum:** Tamamlandı
+- **Scanner:** Gitleaks v8.30.1; Darwin/Linux x64/arm64 release checksum'ları sabit.
+- **Local:** Çalışma ağacı ve Git geçmişi fail-closed taranır.
+- **CI:** Pull request, main push ve workflow dispatch üzerinde full-history scan çalışır.
+- **Test:** Gerçek credential içermeyen runtime synthetic finding beklenen exit code ile yakalandı;
+  finding içeriği rapora yazılmadı.
+- **Suppression:** Merkezi `.gitleaksignore` ve gerekçeli review politikası belgelendi.
+- **Sonraki görev:** TASK-011D

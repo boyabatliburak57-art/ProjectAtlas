@@ -20,6 +20,8 @@
 - README ve ATLAS_INDEX güncellendi.
 - Index dışında kalan Drizzle veri erişimi kararı ADR-004'ten ADR-006'ya taşındı.
 - ADR dosya adı, başlığı, resmî indeks ve manifest referansları benzersiz kimlikle hizalandı.
+- Gitleaks v8.30.1 local çalışma ağacı/Git geçmişi scan'i ve fail-closed CI kapısı eklendi.
+- Synthetic detection testi ve merkezi suppression politikası belgelendi.
 
 ## 0.3.0-indicator-scanner-core — 2026-07-11
 

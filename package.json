@@ -16,6 +16,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "turbo run lint",
+    "secret:scan": "bash scripts/secret-scan.sh --all",
+    "secret:scan:test": "bash scripts/test-secret-scan.sh",
     "test": "turbo run test",
     "test:adr-validator": "node --test scripts/validate-adr-identifiers.test.mjs",
     "validate:adr": "node scripts/validate-adr-identifiers.mjs",

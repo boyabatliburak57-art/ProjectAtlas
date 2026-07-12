@@ -1,0 +1,2 @@
+# Central suppression file. Every fingerprint added below must include a review reason
+# in the same pull request and must never contain the detected secret value.

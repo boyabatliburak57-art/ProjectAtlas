@@ -1,0 +1,8 @@
+title = "Project Atlas Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated and gitignored Next.js build artifacts; source files remain scanned"
+paths = ['''(^|/)apps/web/\.next/''']
