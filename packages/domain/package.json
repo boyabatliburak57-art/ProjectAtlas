@@ -6,6 +6,10 @@
   "scripts": {
     "build": "tsc --noEmit",
     "lint": "eslint .",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "vitest": "4.1.10"
   }
 }

@@ -1,5 +1,6 @@
 # TASK-012 — Indicator Domain Contracts
 
+**Durum:** Tamamlandı
 **Bağımlılık:** TASK-011
 
 ## Amaç

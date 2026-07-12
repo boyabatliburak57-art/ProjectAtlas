@@ -1,5 +1,6 @@
 # TASK-013 — Indicator Math Primitives
 
+**Durum:** Tamamlandı
 **Bağımlılık:** TASK-012
 
 ## Kapsam

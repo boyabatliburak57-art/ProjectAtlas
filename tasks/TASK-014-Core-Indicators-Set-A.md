@@ -1,5 +1,6 @@
 # TASK-014 — Core Indicators Set A
 
+**Durum:** Tamamlandı
 **Bağımlılık:** TASK-013
 
 ## İndikatörler
