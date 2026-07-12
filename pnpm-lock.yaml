@@ -35,6 +35,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@atlas/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@nestjs/common':
         specifier: 11.1.28
         version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)

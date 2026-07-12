@@ -1,5 +1,7 @@
 # TASK-020 — Scanner Execution Planner
 
+**Durum:** Tamamlandı
+
 **Bağımlılık:** TASK-016, TASK-018, TASK-019
 
 ## Kapsam

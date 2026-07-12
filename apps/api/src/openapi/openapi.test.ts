@@ -23,11 +23,18 @@ describe('OpenAPI document', () => {
     await application.close();
   });
 
-  it('contains separate liveness and readiness operations', () => {
+  it('contains health and indicator catalog operations', () => {
     const document = createOpenApiDocument(application);
 
     expect(document.info.version).toBe('1.0');
     expect(document.paths['/health/live']?.get).toBeDefined();
     expect(document.paths['/health/ready']?.get).toBeDefined();
+    expect(document.paths['/api/v1/indicators']?.get).toBeDefined();
+    expect(document.paths['/api/v1/indicators/{code}']?.get).toBeDefined();
+    const listParameters =
+      document.paths['/api/v1/indicators']?.get?.parameters;
+    expect(JSON.stringify(listParameters)).toContain('category');
+    expect(JSON.stringify(listParameters)).toContain('search');
+    expect(JSON.stringify(listParameters)).toContain('status');
   });
 });

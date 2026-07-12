@@ -48,6 +48,15 @@ export interface IndicatorCatalogEntry {
   readonly outputMetadata: Readonly<Record<string, unknown>>;
   readonly outputSpecification: IndicatorOutputSpecification;
   readonly documentationReference: string;
+  readonly status: 'enabled' | 'disabled';
+}
+
+export interface IndicatorRegistrationOptions {
+  readonly enabled?: boolean;
+}
+
+export interface IndicatorCatalogOptions {
+  readonly includeDisabled?: boolean;
 }
 
 export interface ResolvedIndicatorDefinition {
@@ -72,6 +81,7 @@ export class IndicatorRegistry {
 
   register<P, O extends IndicatorOutput>(
     definition: IndicatorDefinition<P, O>,
+    options: IndicatorRegistrationOptions = {},
   ): this {
     const identifier = registryKey(definition.code, definition.version);
     if (this.entries.has(identifier)) {
@@ -88,6 +98,7 @@ export class IndicatorRegistry {
       outputMetadata: definition.outputSchema.metadata,
       outputSpecification: definition.outputSpecification,
       documentationReference: definition.documentationReference,
+      status: options.enabled === false ? 'disabled' : 'enabled',
     };
     this.entries.set(identifier, {
       catalog,
@@ -111,9 +122,15 @@ export class IndicatorRegistry {
     );
   }
 
-  catalog(): readonly IndicatorCatalogEntry[] {
+  catalog(
+    options: IndicatorCatalogOptions = {},
+  ): readonly IndicatorCatalogEntry[] {
     return [...this.entries.values()]
       .map(({ catalog }) => catalog)
+      .filter(
+        ({ status }) =>
+          options.includeDisabled === true || status === 'enabled',
+      )
       .sort((left, right) =>
         left.code === right.code
           ? left.version - right.version

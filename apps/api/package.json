@@ -4,12 +4,12 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "pnpm --filter @atlas/domain build && tsc -p tsconfig.build.json",
     "dev": "tsx watch src/main.ts",
     "lint": "eslint src",
     "openapi:check": "vitest run src/openapi/openapi.test.ts",
     "start": "node dist/main.js",
-    "test": "vitest run",
+    "test": "pnpm --filter @atlas/domain build && vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
@@ -23,6 +23,7 @@
     "vitest": "4.1.10"
   },
   "dependencies": {
+    "@atlas/domain": "workspace:*",
     "@nestjs/common": "11.1.28",
     "@nestjs/config": "4.0.4",
     "@nestjs/core": "11.1.28",

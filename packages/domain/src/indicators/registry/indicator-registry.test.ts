@@ -48,6 +48,17 @@ describe('IndicatorRegistry', () => {
       keys: ['macd', 'signal', 'histogram'],
     });
   });
+
+  it('excludes disabled definitions from the public catalog', () => {
+    const registry = new IndicatorRegistry().register(smaDefinition, {
+      enabled: false,
+    });
+
+    expect(registry.catalog()).toEqual([]);
+    expect(registry.catalog({ includeDisabled: true })).toMatchObject([
+      { code: 'SMA', status: 'disabled' },
+    ]);
+  });
 });
 
 function expectCode(action: () => unknown, code: IndicatorDomainError['code']) {
