@@ -22,7 +22,7 @@
 - ARCH-002 Market Data Engine
 - ARCH-003 Indicator Engine
 - ARCH-004 Scanner Engine
-- ADR-001–ADR-005
+- ADR-001–ADR-006
 
 ## Veri ve API
 

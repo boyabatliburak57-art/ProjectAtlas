@@ -18,6 +18,8 @@
 
 - TASK-012 öncesine zorunlu remediation geçiş kapısı eklendi.
 - README ve ATLAS_INDEX güncellendi.
+- Index dışında kalan Drizzle veri erişimi kararı ADR-004'ten ADR-006'ya taşındı.
+- ADR dosya adı, başlığı, resmî indeks ve manifest referansları benzersiz kimlikle hizalandı.
 
 ## 0.3.0-indicator-scanner-core — 2026-07-11
 

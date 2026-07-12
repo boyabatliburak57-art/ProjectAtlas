@@ -53,7 +53,7 @@ DOC-007 CI kapılarında formatting zorunludur. Audit sırasında dosyalar düze
 
 İki ayrı kabul edilmiş karar `ADR-004` kimliğini kullanıyor:
 
-- `architecture/ADR-004-Drizzle-PostgreSQL-Data-Access.md`
+- `architecture/ADR-006-Drizzle-PostgreSQL-Data-Access.md` (remediation sonrası yol)
 - `architecture/ADR-004-Indicator-Versioning-and-Fixtures.md`
 
 ATLAS_INDEX, ADR'leri `ADR-001–ADR-005` aralığıyla tanımlıyor. Kabul edilmiş ADR'ler belge
@@ -87,7 +87,7 @@ dedicated secret scanner yerine geçmediği için sonuç `passed` sayılmadı.
 Ek sapmalar:
 
 - `manifest.json` içindeki declared/listed file count 59/59 ve tüm listelenen yollar mevcut.
-- `architecture/ADR-004-Drizzle-PostgreSQL-Data-Access.md` ve
+- `architecture/ADR-006-Drizzle-PostgreSQL-Data-Access.md` ve
   `guides/LOCAL_DEVELOPMENT.md` manifestte listelenmiyor.
 - Repository'de 8 Mermaid bloğu bulundu; render doğrulayıcı çalıştırılmadı (`not verifiable`).
 - TASK-001 kartının durumu hâlâ `Hazır` (`deviation`).

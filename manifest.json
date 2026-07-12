@@ -3,7 +3,7 @@
   "version": "0.3.1-foundation-remediation",
   "generated_at": "2026-07-11",
   "cumulative": true,
-  "file_count": 68,
+  "file_count": 69,
   "files": [
     "ATLAS_INDEX.md",
     "CHANGELOG.md",
@@ -19,6 +19,7 @@
     "architecture/ADR-003-Versioned-Scan-Rule-AST.md",
     "architecture/ADR-004-Indicator-Versioning-and-Fixtures.md",
     "architecture/ADR-005-Three-State-Scan-Evaluation.md",
+    "architecture/ADR-006-Drizzle-PostgreSQL-Data-Access.md",
     "architecture/ADR_INDEX.md",
     "architecture/ARCH-001-System-Overview.md",
     "architecture/ARCH-002-Market-Data-Engine.md",

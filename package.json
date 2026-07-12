@@ -17,6 +17,8 @@
     "format:check": "prettier --check .",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "test:adr-validator": "node --test scripts/validate-adr-identifiers.test.mjs",
+    "validate:adr": "node scripts/validate-adr-identifiers.mjs",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {

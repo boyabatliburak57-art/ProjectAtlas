@@ -1,4 +1,4 @@
-# ADR-004 — PostgreSQL Veri Erişimi için Drizzle
+# ADR-006 — PostgreSQL Veri Erişimi için Drizzle
 
 **Durum:** Kabul edildi  
 **Tarih:** 2026-07-12

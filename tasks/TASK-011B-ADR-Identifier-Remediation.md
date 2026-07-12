@@ -1,6 +1,6 @@
 # TASK-011B — ADR Identifier Remediation
 
-**Durum:** Hazır  
+**Durum:** Tamamlandı
 **Bağımlılık:** TASK-011A
 
 ## Amaç
@@ -44,3 +44,14 @@ Dosya adını, H1 başlığını, ATLAS_INDEX ve tüm referansları güncelle.
 Duplicate ADR identifier kontrol script'i ekle ve test et.
 Karar metinlerinin anlamını değiştirme.
 ```
+
+## Tamamlanma notu
+
+- **Tarih:** 2026-07-12
+- **Durum:** Tamamlandı
+- **Kimlik kararı:** Resmî index dışında kalan Drizzle veri erişimi belgesi ADR-004'ten
+  bir sonraki boş kimlik olan ADR-006'ya taşındı.
+- **Doğrulama:** Dosya/H1/index uyumu, duplicate kimlik ve index tamlığı için root doğrulama
+  script'i eklendi. Geçerli, duplicate ve uyuşmayan fixture testleri geçti.
+- **Karar içeriği:** H1 dışındaki ADR metni değiştirilmedi.
+- **Sonraki görev:** TASK-011C

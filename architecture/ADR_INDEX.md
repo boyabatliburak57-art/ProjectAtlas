@@ -13,17 +13,19 @@ Bu dosya Project Atlas mimari karar kayıtlarının resmi indeksidir.
 
 ## Mevcut kayıtlar
 
-| Kimlik  | Başlık                            | Durum    |
-| ------- | --------------------------------- | -------- |
-| ADR-001 | Modular Monolith ile Başlama      | Accepted |
-| ADR-002 | Backend için TypeScript ve NestJS | Accepted |
-| ADR-003 | Tarama Kuralları için Sürümlü AST | Accepted |
-| ADR-004 | Indicator Versioning and Fixtures | Accepted |
-| ADR-005 | Three-State Scan Evaluation       | Accepted |
+| Kimlik  | Başlık                               | Durum    |
+| ------- | ------------------------------------ | -------- |
+| ADR-001 | Modular Monolith ile Başlama         | Accepted |
+| ADR-002 | Backend için TypeScript ve NestJS    | Accepted |
+| ADR-003 | Tarama Kuralları için Sürümlü AST    | Accepted |
+| ADR-004 | Indicator Versioning and Fixtures    | Accepted |
+| ADR-005 | Three-State Scan Evaluation          | Accepted |
+| ADR-006 | PostgreSQL Veri Erişimi için Drizzle | Accepted |
 
 ## Çakışma düzeltme notu
 
-Repository'de bu indeks dışındaki başka bir kabul edilmiş belge `ADR-004` kimliğini taşıyorsa:
+ADR-006, daha önce index dışında kalan Drizzle veri erişimi kararının duplicate ADR-004
+kimliğinden taşınmasıyla ayrılmıştır. Kimlik düzeltmelerinde:
 
 1. Belgelerin oluşturulma sırası ve referansları incelenir.
 2. Daha sonra oluşturulan veya index dışı kalan belge bir sonraki boş kimliğe taşınır.
