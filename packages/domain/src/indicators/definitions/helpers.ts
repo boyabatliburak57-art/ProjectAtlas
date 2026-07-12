@@ -1,6 +1,7 @@
 import type {
   IndicatorInput,
   IndicatorInputField,
+  MultiIndicatorOutput,
   ScalarIndicatorOutput,
   WarmupRequirement,
 } from '../contracts.js';
@@ -19,6 +20,19 @@ export function fieldSeries(
 
 export function scalar(values: NumericSeries): ScalarIndicatorOutput {
   return { kind: 'scalar', values };
+}
+
+export function multi(
+  outputs: Readonly<Record<string, NumericSeries>>,
+): MultiIndicatorOutput {
+  return { kind: 'multi', outputs };
+}
+
+export function alignSeries(
+  values: NumericSeries,
+  firstValidIndex: number,
+): NumericSeries {
+  return values.map((value, index) => (index < firstValidIndex ? null : value));
 }
 
 export function periodWarmup(period: number): WarmupRequirement {

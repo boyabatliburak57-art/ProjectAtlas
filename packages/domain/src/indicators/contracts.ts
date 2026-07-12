@@ -39,6 +39,7 @@ export interface IndicatorInput {
 }
 
 export interface DomainSchema<T> {
+  readonly metadata: Readonly<Record<string, unknown>>;
   parse(value: unknown): T;
 }
 

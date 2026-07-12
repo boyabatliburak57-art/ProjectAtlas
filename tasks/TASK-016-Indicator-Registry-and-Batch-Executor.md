@@ -1,5 +1,6 @@
 # TASK-016 — Indicator Registry and Batch Executor
 
+**Durum:** Tamamlandı
 **Bağımlılık:** TASK-014, TASK-015
 
 ## Kapsam
