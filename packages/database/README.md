@@ -38,8 +38,11 @@ kabul edilmez.
 
 ## Seed
 
-Seed, `manual-import` kodlu inactive provider kaydını sabit UUID ve upsert ile oluşturur. Aynı
-seed tekrar çalıştırılabilir ve duplicate kayıt üretmez.
+Seed, `manual-import` kodlu inactive provider kaydına ek olarak DOC-012'deki sekiz preset
+kategorisini ve on published preset'in versioned AST revision'ını oluşturur. Preset AST'leri
+transaction başlamadan önce domain validator, indicator registry ve execution planner ile
+doğrulanır. Sabit kimlikler, upsert ve revision conflict-do-nothing politikası sayesinde seed
+tekrar çalıştırılabilir ve duplicate kayıt üretmez.
 
 ## Geri dönüş
 

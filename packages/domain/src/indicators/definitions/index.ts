@@ -4,6 +4,7 @@ export * from './schemas.js';
 export * from './set-b-oscillators.js';
 export * from './set-b-trend.js';
 export * from './set-b-volume.js';
+export * from './directional-trend.js';
 export * from './volatility.js';
 export * from './volume.js';
 

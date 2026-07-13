@@ -4,6 +4,9 @@ import {
   createDatabase,
   instruments,
   PostgresScanRunRepository,
+  presetScanRevisions,
+  presetScans,
+  savedScans,
   scanResults,
   scanRuns,
   type Database,
@@ -183,7 +186,47 @@ export function createScanRunApplication(
       resolve: (filter) => resolveUniverse(connection.database, filter),
     },
     sourceAuthorization: {
-      authorize: ({ source }) => Promise.resolve(source.type === 'ad_hoc'),
+      authorize: async ({ userId, source }) => {
+        if (source.type === 'ad_hoc') return true;
+        if (source.type === 'preset_scan' && source.id !== undefined) {
+          const rows = await connection.database
+            .select({ revision: presetScanRevisions.revision })
+            .from(presetScans)
+            .innerJoin(
+              presetScanRevisions,
+              and(
+                eq(presetScanRevisions.presetScanId, presetScans.id),
+                eq(presetScanRevisions.revision, presetScans.currentRevision),
+              ),
+            )
+            .where(
+              and(
+                eq(presetScans.id, source.id),
+                eq(presetScans.status, 'published'),
+                eq(presetScanRevisions.lifecycleStatus, 'published'),
+              ),
+            )
+            .limit(1);
+          return rows[0]?.revision === source.revision;
+        }
+        if (source.type !== 'saved_scan' || source.id === undefined)
+          return false;
+        const rows = await connection.database
+          .select({
+            ownerUserId: savedScans.ownerUserId,
+            status: savedScans.status,
+            currentRevision: savedScans.currentRevision,
+          })
+          .from(savedScans)
+          .where(eq(savedScans.id, source.id))
+          .limit(1);
+        const scan = rows[0];
+        if (scan === undefined || scan.ownerUserId !== userId) return false;
+        if (scan.status === 'deleted') {
+          return { allowed: false, errorCode: 'SAVED_SCAN_DELETED' };
+        }
+        return source.revision === scan.currentRevision;
+      },
     },
     planner: {
       indicatorRegistry: createCoreIndicatorRegistry(),

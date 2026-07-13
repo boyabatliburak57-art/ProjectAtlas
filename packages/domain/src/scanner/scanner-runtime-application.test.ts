@@ -7,6 +7,7 @@ import type {
   NewScanRun,
   ScanRun,
   ScanRunRepository,
+  ScanSourceAuthorizationPort,
   ScanRunTransition,
 } from './runtime/contracts.js';
 import { ScanRunApplicationService } from './runtime/scan-run-application-service.js';
@@ -145,7 +146,9 @@ function setup(
       resolvedAt: new Date('2026-07-13T09:59:00.000Z'),
     }),
   );
-  const authorize = vi.fn(() => Promise.resolve(true));
+  const authorize = vi.fn<ScanSourceAuthorizationPort['authorize']>(() =>
+    Promise.resolve(true),
+  );
   const entitlementCheck = vi.fn(() => ({
     allowed: options.allowed ?? true,
   }));
@@ -270,6 +273,44 @@ describe('ScanRunApplicationService', () => {
         rule: rule(),
       }),
     ).rejects.toMatchObject({ code: 'SCAN_UNIVERSE_EMPTY' });
+  });
+
+  it('does not start a run from a deleted saved scan', async () => {
+    const runtime = setup();
+    runtime.authorize.mockResolvedValue({
+      allowed: false,
+      errorCode: 'SAVED_SCAN_DELETED',
+    });
+
+    await expect(
+      runtime.service.create({
+        userId,
+        idempotencyKey: 'deleted-saved-scan',
+        source: { type: 'saved_scan', id: randomUUID(), revision: 1 },
+        rule: rule(),
+      }),
+    ).rejects.toMatchObject({ code: 'SAVED_SCAN_DELETED' });
+    expect(runtime.repository.runs).toHaveLength(0);
+  });
+
+  it('persists the exact preset source revision on a run', async () => {
+    const runtime = setup();
+    const presetId = randomUUID();
+    const created = await runtime.service.create({
+      userId,
+      idempotencyKey: 'preset-revision',
+      source: { type: 'preset_scan', id: presetId, revision: 3 },
+      rule: rule(),
+    });
+
+    expect(created.run.source).toEqual({
+      type: 'preset_scan',
+      id: presetId,
+      revision: 3,
+    });
+    expect(runtime.repository.runs.get(created.run.id)?.source.revision).toBe(
+      3,
+    );
   });
 
   it('enforces owner-only read and cooperative idempotent cancellation', async () => {

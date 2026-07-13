@@ -30,11 +30,23 @@ export class ScanRunApplicationService {
       throw new ScanRunApplicationError('IDEMPOTENCY_KEY_REQUIRED');
     }
     const source = request.source ?? defaultSource;
-    const authorized = await this.dependencies.sourceAuthorization.authorize({
-      userId: request.userId,
-      source,
-    });
+    const authorization = await this.dependencies.sourceAuthorization.authorize(
+      {
+        userId: request.userId,
+        source,
+      },
+    );
+    const authorized =
+      typeof authorization === 'boolean'
+        ? authorization
+        : authorization.allowed;
     if (!authorized) {
+      if (
+        typeof authorization !== 'boolean' &&
+        authorization.errorCode !== undefined
+      ) {
+        throw new ScanRunApplicationError(authorization.errorCode);
+      }
       throw new ScanRunApplicationError('SCAN_SOURCE_ACCESS_DENIED');
     }
 

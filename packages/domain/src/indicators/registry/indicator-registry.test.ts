@@ -31,8 +31,8 @@ describe('IndicatorRegistry', () => {
   it('produces a sorted catalog with parameter and output metadata', () => {
     const catalog = createCoreIndicatorRegistry().catalog();
 
-    expect(catalog).toHaveLength(20);
-    expect(new Set(catalog.map(({ code }) => code)).size).toBe(20);
+    expect(catalog).toHaveLength(22);
+    expect(new Set(catalog.map(({ code }) => code)).size).toBe(22);
     expect(catalog.map(({ code }) => code)).toEqual(
       catalog.map(({ code }) => code).sort(),
     );

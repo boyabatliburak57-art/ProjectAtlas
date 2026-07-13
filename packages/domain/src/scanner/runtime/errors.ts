@@ -9,7 +9,8 @@ export type ScanRunApplicationErrorCode =
   | 'SCAN_RUN_ACCESS_DENIED'
   | 'SCAN_RUN_NOT_CANCELLABLE'
   | 'SCAN_RUN_INVALID_TRANSITION'
-  | 'SCAN_SOURCE_ACCESS_DENIED';
+  | 'SCAN_SOURCE_ACCESS_DENIED'
+  | 'SAVED_SCAN_DELETED';
 
 export class ScanRunApplicationError extends Error {
   override readonly name = 'ScanRunApplicationError';

@@ -72,9 +72,9 @@ describe('Indicator Catalog API', () => {
       .expect(200);
     const body = listResponseSchema.parse(response.body);
 
-    expect(body.data.total).toBe(20);
-    expect(body.data.items).toHaveLength(20);
-    expect(new Set(body.data.items.map(({ code }) => code)).size).toBe(20);
+    expect(body.data.total).toBe(22);
+    expect(body.data.items).toHaveLength(22);
+    expect(new Set(body.data.items.map(({ code }) => code)).size).toBe(22);
     expect(body.data.items.find(({ code }) => code === 'MACD')).toMatchObject({
       output: { type: 'multi-series' },
       parameters: { type: 'object' },

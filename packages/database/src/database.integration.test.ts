@@ -149,6 +149,24 @@ describe('PostgreSQL migrations', () => {
       select count(*)::text as count from scan_categories
     `);
     expect(categories.rows[0]?.count).toBe('8');
+
+    const presets = await db.execute<{ count: string }>(sql`
+      select count(*)::text as count from preset_scans
+    `);
+    const revisions = await db.execute<{ count: string }>(sql`
+      select count(*)::text as count from preset_scan_revisions
+    `);
+    expect(presets.rows[0]?.count).toBe('10');
+    expect(revisions.rows[0]?.count).toBe('10');
+
+    const published = await db.execute<{ count: string }>(sql`
+      select count(*)::text as count
+      from preset_scans p
+      join preset_scan_revisions r
+        on r.preset_scan_id = p.id and r.revision = p.current_revision
+      where p.status = 'published' and r.lifecycle_status = 'published'
+    `);
+    expect(published.rows[0]?.count).toBe('10');
   });
 
   it('keeps saved and preset revisions immutable and parents soft deletable', async () => {

@@ -37,6 +37,10 @@ import {
   volumeSmaDefinition,
 } from '../definitions/volume.js';
 import { IndicatorDomainError } from '../errors.js';
+import {
+  adxDefinition,
+  supertrendDefinition,
+} from '../definitions/directional-trend.js';
 
 export interface IndicatorCatalogEntry {
   readonly code: string;
@@ -160,7 +164,9 @@ export function createCoreIndicatorRegistry(): IndicatorRegistry {
     .register(williamsRDefinition)
     .register(cmfDefinition)
     .register(mfiDefinition)
-    .register(keltnerChannelDefinition);
+    .register(keltnerChannelDefinition)
+    .register(adxDefinition)
+    .register(supertrendDefinition);
 }
 
 function registryKey(code: string, version: number): string {

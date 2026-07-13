@@ -34,12 +34,22 @@ import {
   SCAN_RUN_APPLICATION,
 } from './scanner/scanner-runtime.ports';
 import { ScannerRuntimeService } from './scanner/scanner-runtime.service';
+import { SavedScansController } from './saved-scans/saved-scans.controller';
+import { createSavedScanApplication } from './saved-scans/saved-scans.infrastructure';
+import { SAVED_SCAN_APPLICATION } from './saved-scans/saved-scans.ports';
+import { SavedScansService } from './saved-scans/saved-scans.service';
+import { PresetScansController } from './preset-scans/preset-scans.controller';
+import { PostgresPresetScanReader } from './preset-scans/preset-scans.infrastructure';
+import { PRESET_SCAN_READER } from './preset-scans/preset-scans.ports';
+import { PresetScansService } from './preset-scans/preset-scans.service';
 
 @Module({
   controllers: [
     HealthController,
     IndicatorCatalogController,
     ScannerRuntimeController,
+    SavedScansController,
+    PresetScansController,
   ],
   imports: [
     ConfigModule.forRoot({
@@ -58,14 +68,24 @@ import { ScannerRuntimeService } from './scanner/scanner-runtime.service';
     ApiDatabase,
     PostgresScannerRuntimeReader,
     BullMqScannerRunDispatcher,
+    PostgresPresetScanReader,
     {
       provide: SCAN_RUN_APPLICATION,
       inject: [ApiDatabase],
       useFactory: createScanRunApplication,
     },
     {
+      provide: SAVED_SCAN_APPLICATION,
+      inject: [ApiDatabase],
+      useFactory: createSavedScanApplication,
+    },
+    {
       provide: SCANNER_RUNTIME_READER,
       useExisting: PostgresScannerRuntimeReader,
+    },
+    {
+      provide: PRESET_SCAN_READER,
+      useExisting: PostgresPresetScanReader,
     },
     {
       provide: SCANNER_RUN_DISPATCHER,
@@ -73,6 +93,8 @@ import { ScannerRuntimeService } from './scanner/scanner-runtime.service';
     },
     IndicatorCatalogService,
     ScannerRuntimeService,
+    SavedScansService,
+    PresetScansService,
   ],
 })
 export class AppModule implements NestModule {

@@ -36,6 +36,13 @@ const uuidSchema = z.uuid();
 const createSchema = z.object({
   rule: z.record(z.string(), z.unknown()),
   requestedHistoryBars: z.number().int().min(1).max(10_000).optional(),
+  source: z
+    .object({
+      type: z.literal('saved_scan'),
+      id: z.uuid(),
+      revision: z.number().int().min(1),
+    })
+    .optional(),
 });
 const querySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(25),
@@ -75,14 +82,67 @@ export class ScannerRuntimeService {
     }
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) throw invalidRequest(parsed.error);
+    return this.createCommand(
+      userId,
+      idempotencyKey,
+      parsed.data,
+      correlationId,
+    );
+  }
+
+  createPreset(
+    userId: string,
+    idempotencyKey: string | undefined,
+    preset: {
+      readonly id: string;
+      readonly revision: number;
+      readonly rule: Readonly<Record<string, unknown>>;
+    },
+    correlationId: string,
+  ): Promise<{ readonly run: ScanRunDto; readonly replayed: boolean }> {
+    return this.createCommand(
+      userId,
+      idempotencyKey,
+      {
+        rule: preset.rule,
+        source: {
+          type: 'preset_scan',
+          id: preset.id,
+          revision: preset.revision,
+        },
+      },
+      correlationId,
+    );
+  }
+
+  private async createCommand(
+    userId: string,
+    idempotencyKey: string | undefined,
+    input: {
+      readonly rule: Readonly<Record<string, unknown>>;
+      readonly requestedHistoryBars?: number | undefined;
+      readonly source?:
+        | {
+            readonly type: 'saved_scan' | 'preset_scan';
+            readonly id: string;
+            readonly revision: number;
+          }
+        | undefined;
+    },
+    correlationId: string,
+  ): Promise<{ readonly run: ScanRunDto; readonly replayed: boolean }> {
+    if (idempotencyKey === undefined || idempotencyKey.trim() === '') {
+      throw httpError('IDEMPOTENCY_KEY_REQUIRED');
+    }
     try {
       const created = await this.commands.create({
         userId,
         idempotencyKey,
-        rule: parsed.data.rule,
-        ...(parsed.data.requestedHistoryBars === undefined
+        rule: input.rule,
+        ...(input.source === undefined ? {} : { source: input.source }),
+        ...(input.requestedHistoryBars === undefined
           ? {}
-          : { requestedHistoryBars: parsed.data.requestedHistoryBars }),
+          : { requestedHistoryBars: input.requestedHistoryBars }),
       });
       await this.dispatcher.dispatch({ runId: created.run.id, correlationId });
       const status = await this.reader.status(created.run.id);
@@ -288,6 +348,7 @@ function httpError(code: string, details?: unknown) {
     return new HttpException(payload, HttpStatus.TOO_MANY_REQUESTS);
   if (code === 'SCAN_RUN_NOT_CANCELLABLE')
     return new ConflictException(payload);
+  if (code === 'SAVED_SCAN_DELETED') return new ConflictException(payload);
   return new BadRequestException(payload);
 }
 
@@ -304,6 +365,7 @@ function errorMessage(code: string): string {
     SCAN_SOURCE_ACCESS_DENIED: 'Access to scan source was denied',
     SCAN_TOO_COMPLEX: 'Scan complexity limit was exceeded',
     SCAN_ENTITLEMENT_VIOLATION: 'Scan entitlement was exceeded',
+    SAVED_SCAN_DELETED: 'Saved scan is deleted',
   };
   return messages[code] ?? 'Scanner request could not be processed';
 }

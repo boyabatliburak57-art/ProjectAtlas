@@ -6,6 +6,20 @@ export class CreateScanRunDto {
 
   @ApiPropertyOptional({ minimum: 1, maximum: 10_000 })
   requestedHistoryBars?: number;
+
+  @ApiPropertyOptional({
+    type: 'object',
+    properties: {
+      type: { type: 'string', enum: ['saved_scan'] },
+      id: { type: 'string', format: 'uuid' },
+      revision: { type: 'integer', minimum: 1 },
+    },
+  })
+  source?: {
+    readonly type: 'saved_scan';
+    readonly id: string;
+    readonly revision: number;
+  };
 }
 
 export class ScanRunResultsQueryDto {

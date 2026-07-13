@@ -101,7 +101,13 @@ export interface ScanSourceAuthorizationPort {
   authorize(input: {
     readonly userId: string;
     readonly source: ScanRunSource;
-  }): Promise<boolean>;
+  }): Promise<
+    | boolean
+    | {
+        readonly allowed: boolean;
+        readonly errorCode?: 'SAVED_SCAN_DELETED' | undefined;
+      }
+  >;
 }
 
 export interface CreateScanRunRequest {

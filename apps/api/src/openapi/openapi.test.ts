@@ -23,7 +23,7 @@ describe('OpenAPI document', () => {
     await application.close();
   });
 
-  it('contains health, indicator and scanner runtime operations', () => {
+  it('contains health, indicator, scanner runtime and saved scan operations', () => {
     const document = createOpenApiDocument(application);
 
     expect(document.info.version).toBe('1.0');
@@ -38,6 +38,32 @@ describe('OpenAPI document', () => {
     ).toBeDefined();
     expect(
       document.paths['/api/v1/scanner/runs/{runId}/cancel']?.post,
+    ).toBeDefined();
+    expect(document.paths['/api/v1/saved-scans']?.get).toBeDefined();
+    expect(document.paths['/api/v1/saved-scans']?.post).toBeDefined();
+    expect(document.paths['/api/v1/saved-scans/{id}']?.get).toBeDefined();
+    expect(document.paths['/api/v1/saved-scans/{id}']?.patch).toBeDefined();
+    expect(document.paths['/api/v1/saved-scans/{id}']?.delete).toBeDefined();
+    expect(
+      document.paths['/api/v1/saved-scans/{id}/clone']?.post,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/saved-scans/{id}/restore']?.post,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/saved-scans/{id}/revisions']?.get,
+    ).toBeDefined();
+    expect(JSON.stringify(document.paths['/api/v1/saved-scans'])).not.toContain(
+      'public',
+    );
+    expect(JSON.stringify(document.paths['/api/v1/saved-scans'])).not.toContain(
+      'share',
+    );
+    expect(document.paths['/api/v1/preset-scan-categories']?.get).toBeDefined();
+    expect(document.paths['/api/v1/preset-scans']?.get).toBeDefined();
+    expect(document.paths['/api/v1/preset-scans/{code}']?.get).toBeDefined();
+    expect(
+      document.paths['/api/v1/preset-scans/{code}/runs']?.post,
     ).toBeDefined();
     const listParameters =
       document.paths['/api/v1/indicators']?.get?.parameters;
