@@ -2,6 +2,21 @@
 
 Project Atlas PostgreSQL şeması, Drizzle migration'ları ve başlangıç seed'i.
 
+## Migration stratejisi
+
+Migration'lar production yönünde forward-only uygulanır. `0002_scanner_runtime` için eşlenmiş
+rollback dosyası `drizzle/rollback/0002_scanner_runtime.down.sql` altındadır. Bu dosya veri
+kaybettiren, yalnız kontrollü recovery için kullanılan manuel bir down migration'dır:
+
+1. Scanner Runtime tablolarının yedeğini al.
+2. Uygulama ve worker yazımlarını durdur.
+3. Down SQL'i transaction içinde çalıştır.
+4. Yalnız eşleşen `0002_scanner_runtime` migration journal kaydını kaldır.
+5. Forward migration'ı yeniden uygula ve constraint/integration testlerini çalıştır.
+
+Normal rollback, ileri yönlü düzeltme migration'ı ile yapılır; production'da journal geçmişi
+yeniden yazılmaz.
+
 ## Komutlar
 
 ```bash

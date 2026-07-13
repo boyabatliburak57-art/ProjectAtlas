@@ -15,6 +15,13 @@
       "when": 1783810239394,
       "tag": "0001_free_bulldozer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783902801924,
+      "tag": "0002_scanner_runtime",
+      "breakpoints": true
     }
   ]
 }

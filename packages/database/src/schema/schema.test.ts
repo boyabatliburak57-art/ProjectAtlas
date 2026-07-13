@@ -9,6 +9,16 @@ import {
   instrumentSymbolHistory,
   priceBars,
   providerInstrumentMappings,
+  presetScanRevisions,
+  presetScans,
+  savedScanRevisions,
+  savedScans,
+  savedScanTags,
+  scanCategories,
+  scanResults,
+  scanRunBatches,
+  scanRunEvents,
+  scanRuns,
   sectors,
 } from './index';
 
@@ -34,6 +44,34 @@ describe('initial database schema', () => {
       'price_bars',
       'data_quality_issues',
       'ingestion_runs',
+    ]);
+  });
+
+  it('exports the ten scanner runtime tables', () => {
+    expect(
+      [
+        scanCategories,
+        savedScans,
+        savedScanRevisions,
+        savedScanTags,
+        presetScans,
+        presetScanRevisions,
+        scanRuns,
+        scanRunBatches,
+        scanResults,
+        scanRunEvents,
+      ].map(getTableName),
+    ).toEqual([
+      'scan_categories',
+      'saved_scans',
+      'saved_scan_revisions',
+      'saved_scan_tags',
+      'preset_scans',
+      'preset_scan_revisions',
+      'scan_runs',
+      'scan_run_batches',
+      'scan_results',
+      'scan_run_events',
     ]);
   });
 });
