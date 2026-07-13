@@ -12,6 +12,7 @@ export function createOpenApiDocument(
     .setTitle('Project Atlas API')
     .setDescription('Project Atlas versioned REST API')
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
 
   return SwaggerModule.createDocument(application, config);

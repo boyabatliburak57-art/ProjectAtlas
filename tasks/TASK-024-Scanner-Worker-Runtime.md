@@ -1,5 +1,7 @@
 # TASK-024 — Scanner Worker Runtime
 
+**Durum:** Tamamlandı
+
 **Bağımlılık:** TASK-016, TASK-019, TASK-020, TASK-023
 
 BullMQ üzerinde execution plan'ı batch'lerle çalıştır; market data load, indicator batch, evaluator, explanation, result upsert, progress, cancellation, retry, timeout ve telemetry ekle.

@@ -22,6 +22,7 @@ Queue adları `atlas.<domain>.v<major>` biçimindedir:
 - `atlas.system.v1`
 - `atlas.system.dead-letter.v1`
 - `atlas.market-data.v1`
+- `atlas.scanner.v1`
 
 Job adları `<domain>.<operation>.v<major>` biçimindedir. Heartbeat işi
 `system.heartbeat.v1` adını kullanır.
@@ -43,6 +44,17 @@ worker-heartbeat-<interval-bucket>
 BullMQ aynı queue içinde aynı `jobId` değerini ikinci kez kabul etmediği için aynı mantıksal
 heartbeat tekrar kuyruğa yazılmaz. Gerçek işlerde `jobId`, provider + instrument + timeframe +
 requested range gibi doğal idempotency anahtarından türetilmelidir.
+
+Scanner run işleri `scanner.run.v1` adıyla ve run ID'den türetilen deterministik job ID ile
+çalışır. Worker immutable execution plan ve universe snapshot'ını PostgreSQL'den yükler;
+evreni `SCANNER_BATCH_SIZE` değerine göre böler, market data/indicator/evaluator hattını
+çalıştırır ve matched/notEvaluable sonuçları idempotent upsert eder. PostgreSQL kalıcı run,
+batch, result ve progress doğruluk kaynağıdır; BullMQ progress hızlı bildirim katmanıdır.
+
+Scanner timeout ayarları `SCANNER_BATCH_TIMEOUT_MS` ve `SCANNER_RUN_TIMEOUT_MS` ile
+sınırlandırılır. Cancellation batch sınırlarında cooperative kontrol edilir. Gerçek piyasa
+veri sağlayıcısı scanner composition root'una bağlanmamıştır; runtime kalıcı ve test fixture
+verisini provider adapter ayrıntısı olmadan okur.
 
 ## Retry ve dead-letter
 
@@ -104,4 +116,4 @@ TEST_DATABASE_URL=postgresql://atlas:password@127.0.0.1:5432/atlas_test \
 pnpm --filter worker build
 ```
 
-Gerçek provider entegrasyonu, indikatör, scanner veya alarm iş mantığı bu kapsamda yer almaz.
+Gerçek provider entegrasyonu ve alarm iş mantığı bu kapsamda yer almaz.

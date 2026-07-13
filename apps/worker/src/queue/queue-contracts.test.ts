@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createHeartbeatJobId,
+  createScannerRunJobId,
   DEFAULT_JOB_OPTIONS,
   QUEUE_NAMES,
 } from './queue-contracts';
@@ -27,5 +28,12 @@ describe('queue contracts', () => {
       backoff: { delay: 1_000, type: 'exponential' },
       removeOnFail: false,
     });
+  });
+
+  it('creates stable scanner run job identities', () => {
+    expect(createScannerRunJobId('run-1')).toBe(createScannerRunJobId('run-1'));
+    expect(createScannerRunJobId('run-1')).not.toBe(
+      createScannerRunJobId('run-2'),
+    );
   });
 });

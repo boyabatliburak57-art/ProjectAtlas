@@ -1,20 +1,11 @@
 import type { JobsOptions } from 'bullmq';
 import { createHash } from 'node:crypto';
+import { ATLAS_JOB_NAMES, ATLAS_QUEUE_NAMES } from '@atlas/types';
 
 import type { BarIngestionJobData } from '../market-data/bars/bar-ingestion-job';
 
-export const QUEUE_NAMES = {
-  deadLetter: 'atlas.system.dead-letter.v1',
-  marketData: 'atlas.market-data.v1',
-  system: 'atlas.system.v1',
-} as const;
-
-export const JOB_NAMES = {
-  barIngestion: 'market-data.bar-ingestion.v1',
-  deadLetter: 'system.dead-letter.v1',
-  heartbeat: 'system.heartbeat.v1',
-  instrumentSync: 'market-data.instrument-sync.v1',
-} as const;
+export const QUEUE_NAMES = ATLAS_QUEUE_NAMES;
+export const JOB_NAMES = ATLAS_JOB_NAMES;
 
 export const DEFAULT_JOB_OPTIONS = {
   attempts: 5,
@@ -57,4 +48,8 @@ export function createBarIngestionJobId(data: BarIngestionJobData): string {
     data.from,
     data.to,
   ]);
+}
+
+export function createScannerRunJobId(runId: string): string {
+  return stableJobId('scanner-run', [runId]);
 }

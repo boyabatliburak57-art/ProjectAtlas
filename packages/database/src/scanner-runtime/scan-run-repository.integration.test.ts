@@ -23,7 +23,7 @@ function requireTestDatabaseUrl(): string {
 
 const userId = '00000000-0000-4000-8000-000000000501';
 const otherUserId = '00000000-0000-4000-8000-000000000502';
-const fixedNow = new Date('2026-07-13T12:00:00.000Z');
+const fixedNow = new Date(Date.now() + 60_000);
 
 function scanRule(limit = 10) {
   return {

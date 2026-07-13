@@ -16,6 +16,11 @@ import {
   QUEUE_NAMES,
 } from '../queue/queue-contracts';
 import { createRedisConnection } from '../queue/redis-connection';
+import {
+  createDefaultScannerComposition,
+  type ScannerComposition,
+} from '../scanner/scanner-composition';
+import type { ScannerRunJobData } from '../scanner/contracts';
 
 interface DeadLetterData {
   readonly attemptsMade: number;
@@ -38,10 +43,13 @@ export class WorkerRuntime {
     private readonly logger: StructuredLogger,
     private readonly systemQueue: Queue,
     private readonly marketDataQueue: Queue,
+    private readonly scannerQueue: Queue<ScannerRunJobData>,
     private readonly deadLetterQueue: Queue<DeadLetterData>,
     private readonly systemWorker: Worker,
     private readonly marketDataWorker: Worker,
+    private readonly scannerWorker: Worker<ScannerRunJobData>,
     private readonly marketDataComposition: MarketDataComposition,
+    private readonly scannerComposition: ScannerComposition,
     private readonly workerId: string,
   ) {}
 
@@ -49,6 +57,7 @@ export class WorkerRuntime {
     environment: WorkerEnvironment,
     logger: StructuredLogger,
     injectedComposition?: MarketDataComposition,
+    injectedScannerComposition?: ScannerComposition,
   ): Promise<WorkerRuntime> {
     const connection = createRedisConnection(environment.REDIS_URL);
     const systemQueue = new Queue(QUEUE_NAMES.system, {
@@ -60,6 +69,10 @@ export class WorkerRuntime {
       defaultJobOptions: DEFAULT_JOB_OPTIONS,
     });
     const marketDataQueue = new Queue(QUEUE_NAMES.marketData, {
+      connection,
+      defaultJobOptions: DEFAULT_JOB_OPTIONS,
+    });
+    const scannerQueue = new Queue<ScannerRunJobData>(QUEUE_NAMES.scanner, {
       connection,
       defaultJobOptions: DEFAULT_JOB_OPTIONS,
     });
@@ -88,15 +101,29 @@ export class WorkerRuntime {
         connection,
       },
     );
+    const scannerComposition =
+      injectedScannerComposition ??
+      createDefaultScannerComposition(environment, logger);
+    const scannerWorker = new Worker<ScannerRunJobData>(
+      QUEUE_NAMES.scanner,
+      (job) => scannerComposition.process(job),
+      {
+        concurrency: environment.WORKER_CONCURRENCY,
+        connection,
+      },
+    );
     const runtime = new WorkerRuntime(
       environment,
       logger,
       systemQueue,
       marketDataQueue,
+      scannerQueue,
       deadLetterQueue,
       systemWorker,
       marketDataWorker,
+      scannerWorker,
       marketDataComposition,
+      scannerComposition,
       randomUUID(),
     );
 
@@ -108,7 +135,11 @@ export class WorkerRuntime {
       runtime.startHeartbeat();
       logger.info('worker.ready', {
         concurrency: environment.WORKER_CONCURRENCY,
-        queues: [QUEUE_NAMES.system, QUEUE_NAMES.marketData],
+        queues: [
+          QUEUE_NAMES.system,
+          QUEUE_NAMES.marketData,
+          QUEUE_NAMES.scanner,
+        ],
       });
       return runtime;
     } catch (error: unknown) {
@@ -133,6 +164,7 @@ export class WorkerRuntime {
     await Promise.all([
       this.systemWorker.pause(false),
       this.marketDataWorker.pause(false),
+      this.scannerWorker.pause(false),
     ]);
     await this.closeConnections();
     this.logger.info('worker.stopped', { reason });
@@ -152,9 +184,11 @@ export class WorkerRuntime {
         Promise.all([
           this.systemQueue.waitUntilReady(),
           this.marketDataQueue.waitUntilReady(),
+          this.scannerQueue.waitUntilReady(),
           this.deadLetterQueue.waitUntilReady(),
           this.systemWorker.waitUntilReady(),
           this.marketDataWorker.waitUntilReady(),
+          this.scannerWorker.waitUntilReady(),
         ]),
         timeoutPromise,
       ]);
@@ -192,9 +226,11 @@ export class WorkerRuntime {
   private registerWorkerEvents(): void {
     this.registerQueueError(this.systemQueue, QUEUE_NAMES.system);
     this.registerQueueError(this.marketDataQueue, QUEUE_NAMES.marketData);
+    this.registerQueueError(this.scannerQueue, QUEUE_NAMES.scanner);
     this.registerQueueError(this.deadLetterQueue, QUEUE_NAMES.deadLetter);
     this.registerJobEvents(this.systemWorker, QUEUE_NAMES.system);
     this.registerJobEvents(this.marketDataWorker, QUEUE_NAMES.marketData);
+    this.registerJobEvents(this.scannerWorker, QUEUE_NAMES.scanner);
   }
 
   private registerQueueError(queue: Queue, queueName: string): void {
@@ -278,10 +314,13 @@ export class WorkerRuntime {
     await Promise.allSettled([
       this.systemWorker.close(),
       this.marketDataWorker.close(),
+      this.scannerWorker.close(),
       this.systemQueue.close(),
       this.marketDataQueue.close(),
+      this.scannerQueue.close(),
       this.deadLetterQueue.close(),
       this.marketDataComposition.close(),
+      this.scannerComposition.close(),
     ]);
   }
 }

@@ -15,6 +15,9 @@ describe('parseEnvironment', () => {
       WORKER_CONCURRENCY: 2,
       WORKER_HEARTBEAT_INTERVAL_MS: 30_000,
       WORKER_LOG_LEVEL: 'info',
+      SCANNER_BATCH_SIZE: 100,
+      SCANNER_BATCH_TIMEOUT_MS: 30_000,
+      SCANNER_RUN_TIMEOUT_MS: 300_000,
       WORKER_STARTUP_TIMEOUT_MS: 10_000,
     });
   });

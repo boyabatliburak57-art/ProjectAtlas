@@ -35,9 +35,15 @@ importers:
 
   apps/api:
     dependencies:
+      '@atlas/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@atlas/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@atlas/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@nestjs/common':
         specifier: 11.1.28
         version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -53,6 +59,12 @@ importers:
       '@nestjs/swagger':
         specifier: 11.4.5
         version: 11.4.5(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)
+      bullmq:
+        specifier: 5.80.1
+        version: 5.80.1
+      drizzle-orm:
+        specifier: 0.45.2
+        version: 0.45.2(@types/pg@8.20.0)(pg@8.22.0)
       reflect-metadata:
         specifier: 0.2.2
         version: 0.2.2
@@ -154,6 +166,12 @@ importers:
       '@atlas/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@atlas/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@atlas/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       bullmq:
         specifier: 5.80.1
         version: 5.80.1
