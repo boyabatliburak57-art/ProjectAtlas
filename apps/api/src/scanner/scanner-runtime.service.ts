@@ -257,7 +257,7 @@ function toRunDto(view: ScanRunStatusView): ScanRunDto {
     timeoutAt: view.timeoutAt?.toISOString() ?? null,
     progress: {
       ...view.progress,
-      phase: publicStatus(view.status),
+      phase: view.progress.phase,
       updatedAt: view.progress.updatedAt.toISOString(),
       percent:
         view.progress.total === 0
@@ -266,6 +266,16 @@ function toRunDto(view: ScanRunStatusView): ScanRunDto {
               100,
               Math.floor((view.progress.processed / view.progress.total) * 100),
             ),
+      source: view.progress.source ?? 'postgresql',
+      stale: view.progress.stale ?? false,
+      terminal:
+        view.progress.terminal ??
+        ['completed', 'failed', 'cancelled', 'expired'].includes(view.status),
+      pollAfterMs:
+        view.progress.pollAfterMs ??
+        (['completed', 'failed', 'cancelled', 'expired'].includes(view.status)
+          ? null
+          : 1_000),
     },
     errorCode: view.errorCode,
   };

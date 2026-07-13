@@ -3,6 +3,9 @@ import type { ScanRunApplicationService, ScanRunStatus } from '@atlas/domain';
 export const SCAN_RUN_APPLICATION = Symbol('SCAN_RUN_APPLICATION');
 export const SCANNER_RUNTIME_READER = Symbol('SCANNER_RUNTIME_READER');
 export const SCANNER_RUN_DISPATCHER = Symbol('SCANNER_RUN_DISPATCHER');
+export const SCANNER_PROGRESS_FAST_READER = Symbol(
+  'SCANNER_PROGRESS_FAST_READER',
+);
 
 export interface ScanRunStatusView {
   readonly id: string;
@@ -26,6 +29,10 @@ export interface ScanRunStatusView {
     readonly warnings: number;
     readonly phase: string;
     readonly updatedAt: Date;
+    readonly source?: 'redis' | 'postgresql' | undefined;
+    readonly stale?: boolean | undefined;
+    readonly terminal?: boolean | undefined;
+    readonly pollAfterMs?: number | null | undefined;
   };
   readonly errorCode: string | null;
 }
@@ -77,6 +84,20 @@ export interface ScannerRunDispatcher {
     readonly runId: string;
     readonly correlationId: string;
   }): Promise<void>;
+}
+
+export interface ScannerFastProgress {
+  readonly total: number;
+  readonly processed: number;
+  readonly matched: number;
+  readonly notEvaluable: number;
+  readonly warnings: number;
+  readonly phase: string;
+  readonly updatedAt: Date;
+}
+
+export interface ScannerProgressFastReader {
+  read(runId: string): Promise<ScannerFastProgress | null>;
 }
 
 export type ScanRunCommands = Pick<

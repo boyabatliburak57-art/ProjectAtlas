@@ -109,9 +109,12 @@ class MemoryScanRunRepository implements ScanRunRepository {
 }
 
 class MemoryRuntimeReader implements ScannerRuntimeReader {
+  readonly statusCalls: string[] = [];
+
   constructor(private readonly repository: MemoryScanRunRepository) {}
 
   async status(runId: string): Promise<ScanRunStatusView | null> {
+    this.statusCalls.push(runId);
     const run = await this.repository.findById(runId);
     if (run === null) return null;
     return {
@@ -357,6 +360,17 @@ describe('Scanner Runtime API', () => {
       .set('x-test-user-id', ownerId)
       .expect(200);
     expect(owned.body).toMatchObject({ data: { id: runId, status: 'queued' } });
+    expect(owned.body).toMatchObject({
+      data: {
+        progress: {
+          source: 'postgresql',
+          stale: false,
+          terminal: false,
+          pollAfterMs: 1_000,
+        },
+      },
+    });
+    const readsBeforeDeniedRequest = reader.statusCalls.length;
 
     const denied = await request(server(application))
       .get(`/api/v1/scanner/runs/${runId}`)
@@ -365,6 +379,7 @@ describe('Scanner Runtime API', () => {
     expect(denied.body).toMatchObject({
       error: { code: 'SCAN_RUN_ACCESS_DENIED' },
     });
+    expect(reader.statusCalls).toHaveLength(readsBeforeDeniedRequest);
   });
 
   it('paginates results with opaque cursors and lazy explanations', async () => {
@@ -431,9 +446,25 @@ describe('Scanner Runtime API', () => {
     expect(terminalStatus.body).toMatchObject({
       data: {
         status: 'completed',
-        progress: { processed: 3, percent: 100 },
+        progress: {
+          processed: 3,
+          percent: 100,
+          terminal: true,
+          pollAfterMs: null,
+        },
       },
     });
+    const terminalReplay = await request(server(application))
+      .get(`/api/v1/scanner/runs/${runId}`)
+      .set('x-test-user-id', ownerId)
+      .expect(200);
+    const firstTerminalProgress = (
+      terminalStatus.body as { data: { progress: unknown } }
+    ).data.progress;
+    const replayedTerminalProgress = (
+      terminalReplay.body as { data: { progress: unknown } }
+    ).data.progress;
+    expect(replayedTerminalProgress).toEqual(firstTerminalProgress);
     const terminal = await request(server(application))
       .post(`/api/v1/scanner/runs/${runId}/cancel`)
       .set('x-test-user-id', ownerId)

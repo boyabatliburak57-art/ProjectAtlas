@@ -18,6 +18,18 @@ const environmentSchema = z.object({
     .url()
     .refine((value) => ['redis:', 'rediss:'].includes(new URL(value).protocol))
     .default('redis://127.0.0.1:6379'),
+  SCANNER_PROGRESS_POLL_AFTER_MS: z.coerce
+    .number()
+    .int()
+    .min(250)
+    .max(30_000)
+    .default(1_000),
+  SCANNER_PROGRESS_STALE_AFTER_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .max(300_000)
+    .default(15_000),
 });
 
 export type Environment = z.infer<typeof environmentSchema>;

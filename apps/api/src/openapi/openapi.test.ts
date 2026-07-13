@@ -84,5 +84,10 @@ describe('OpenAPI document', () => {
     expect(JSON.stringify(resultParameters)).toContain('cursor');
     expect(JSON.stringify(resultParameters)).toContain('includeExplanation');
     expect(document.components?.securitySchemes).toHaveProperty('bearer');
+    const progressSchema = document.components?.schemas?.ScanRunProgressDto;
+    expect(JSON.stringify(progressSchema)).toContain('source');
+    expect(JSON.stringify(progressSchema)).toContain('stale');
+    expect(JSON.stringify(progressSchema)).toContain('terminal');
+    expect(JSON.stringify(progressSchema)).toContain('pollAfterMs');
   });
 });

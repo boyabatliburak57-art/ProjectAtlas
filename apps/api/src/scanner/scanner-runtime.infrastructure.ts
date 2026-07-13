@@ -32,9 +32,11 @@ import type {
   ScanResultPage,
   ScanResultSort,
   ScannerRunDispatcher,
+  ScannerProgressFastReader,
   ScannerRuntimeReader,
   ScanRunStatusView,
 } from './scanner-runtime.ports';
+import { FallbackScannerRuntimeReader } from './scanner-progress';
 
 @Injectable()
 export class ApiDatabase implements OnApplicationShutdown {
@@ -177,6 +179,45 @@ export class BullMqScannerRunDispatcher
   }
 }
 
+@Injectable()
+export class BullMqScannerProgressReader
+  implements ScannerProgressFastReader, OnApplicationShutdown
+{
+  private queue: Queue<ScannerRunQueuePayload> | undefined;
+
+  constructor(private readonly config: ConfigService) {}
+
+  async read(runId: string) {
+    const queue = this.queue ?? this.createQueue();
+    this.queue = queue;
+    const job = await queue.getJob(scannerJobId(runId));
+    return parseFastProgress(job?.progress);
+  }
+
+  async onApplicationShutdown(): Promise<void> {
+    await this.queue?.close();
+  }
+
+  private createQueue(): Queue<ScannerRunQueuePayload> {
+    return new Queue(ATLAS_QUEUE_NAMES.scanner, {
+      connection: redisProgressConnection(
+        this.config.getOrThrow<string>('REDIS_URL'),
+      ),
+    });
+  }
+}
+
+export function createFallbackScannerRuntimeReader(
+  durable: PostgresScannerRuntimeReader,
+  fast: ScannerProgressFastReader,
+  config: ConfigService,
+): ScannerRuntimeReader {
+  return new FallbackScannerRuntimeReader(durable, fast, {
+    staleAfterMs: config.getOrThrow<number>('SCANNER_PROGRESS_STALE_AFTER_MS'),
+    pollAfterMs: config.getOrThrow<number>('SCANNER_PROGRESS_POLL_AFTER_MS'),
+  });
+}
+
 export function createScanRunApplication(
   connection: ApiDatabase,
 ): ScanRunApplicationService {
@@ -301,4 +342,59 @@ function redisConnection(redisUrl: string): ConnectionOptions {
       : { db: Number(url.pathname.slice(1)) }),
     ...(url.protocol === 'rediss:' ? { tls: {} } : {}),
   };
+}
+
+function redisProgressConnection(redisUrl: string): ConnectionOptions {
+  const url = new URL(redisUrl);
+  return {
+    host: url.hostname,
+    port: url.port === '' ? 6379 : Number(url.port),
+    connectTimeout: 500,
+    enableOfflineQueue: false,
+    maxRetriesPerRequest: 1,
+    ...(url.username === ''
+      ? {}
+      : { username: decodeURIComponent(url.username) }),
+    ...(url.password === ''
+      ? {}
+      : { password: decodeURIComponent(url.password) }),
+    ...(url.pathname === '' || url.pathname === '/'
+      ? {}
+      : { db: Number(url.pathname.slice(1)) }),
+    ...(url.protocol === 'rediss:' ? { tls: {} } : {}),
+  };
+}
+
+function parseFastProgress(value: unknown) {
+  if (!isRecord(value)) return null;
+  const updatedAt =
+    typeof value.updatedAt === 'string' ? new Date(value.updatedAt) : null;
+  if (
+    !Number.isInteger(value.total) ||
+    !Number.isInteger(value.processed) ||
+    !Number.isInteger(value.matched) ||
+    !Number.isInteger(value.notEvaluable) ||
+    !Number.isInteger(value.warnings) ||
+    typeof value.phase !== 'string' ||
+    !['loading', 'evaluating', 'persisting', 'completed'].includes(
+      value.phase,
+    ) ||
+    updatedAt === null ||
+    !Number.isFinite(updatedAt.getTime())
+  ) {
+    return null;
+  }
+  return {
+    total: value.total as number,
+    processed: value.processed as number,
+    matched: value.matched as number,
+    notEvaluable: value.notEvaluable as number,
+    warnings: value.warnings as number,
+    phase: value.phase,
+    updatedAt,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

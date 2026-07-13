@@ -66,6 +66,18 @@ export class ScanRunProgressDto {
 
   @ApiProperty()
   percent!: number;
+
+  @ApiProperty({ enum: ['redis', 'postgresql'] })
+  source!: string;
+
+  @ApiProperty()
+  stale!: boolean;
+
+  @ApiProperty()
+  terminal!: boolean;
+
+  @ApiPropertyOptional({ nullable: true, minimum: 0 })
+  pollAfterMs!: number | null;
 }
 
 export class ScanRunDto {

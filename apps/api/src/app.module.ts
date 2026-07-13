@@ -4,7 +4,7 @@ import {
   RequestMethod,
   type NestModule,
 } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
 import { createCoreIndicatorRegistry } from '@atlas/domain';
 
@@ -24,12 +24,15 @@ import {
 import { ScannerRuntimeController } from './scanner/scanner-runtime.controller';
 import {
   ApiDatabase,
+  BullMqScannerProgressReader,
   BullMqScannerRunDispatcher,
+  createFallbackScannerRuntimeReader,
   createScanRunApplication,
   PostgresScannerRuntimeReader,
 } from './scanner/scanner-runtime.infrastructure';
 import {
   SCANNER_RUN_DISPATCHER,
+  SCANNER_PROGRESS_FAST_READER,
   SCANNER_RUNTIME_READER,
   SCAN_RUN_APPLICATION,
 } from './scanner/scanner-runtime.ports';
@@ -68,6 +71,7 @@ import { PresetScansService } from './preset-scans/preset-scans.service';
     ApiDatabase,
     PostgresScannerRuntimeReader,
     BullMqScannerRunDispatcher,
+    BullMqScannerProgressReader,
     PostgresPresetScanReader,
     {
       provide: SCAN_RUN_APPLICATION,
@@ -81,7 +85,16 @@ import { PresetScansService } from './preset-scans/preset-scans.service';
     },
     {
       provide: SCANNER_RUNTIME_READER,
-      useExisting: PostgresScannerRuntimeReader,
+      inject: [
+        PostgresScannerRuntimeReader,
+        SCANNER_PROGRESS_FAST_READER,
+        ConfigService,
+      ],
+      useFactory: createFallbackScannerRuntimeReader,
+    },
+    {
+      provide: SCANNER_PROGRESS_FAST_READER,
+      useExisting: BullMqScannerProgressReader,
     },
     {
       provide: PRESET_SCAN_READER,

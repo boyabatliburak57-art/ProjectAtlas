@@ -47,7 +47,19 @@ context'inden alır. İstemci tarafından gönderilen user ID ownership kanıtı
 
 ## Progress
 
-İlk sürüm polling. Gerekli görülürse SSE eklenir; WebSocket zorunlu değildir.
+İlk sürüm `GET /scanner/runs/{runId}` polling kullanır. Progress; total, processed,
+matched, notEvaluable, warnings, phase, percent ve updatedAt alanlarına ek olarak aşağıdaki
+delivery metadata'sını taşır:
+
+- `source`: `redis` fast-path veya `postgresql` durable fallback
+- `stale`: seçilen snapshot stale threshold'u aşmışsa `true`
+- `terminal`: terminal run durumunda `true`
+- `pollAfterMs`: aktif run için önerilen polling aralığı; terminal durumda `null`
+
+Sayaçlar ve `updatedAt` monoton bir watermark ile geriye gitmez. Terminal snapshot sabitlenir
+ve Redis tekrar okunmaz. Redis unavailable, eksik, geçersiz veya durable snapshot'ın gerisindeyse
+PostgreSQL kullanılır. Ownership kontrolü progress kaynakları okunmadan önce yapılır. WebSocket
+eklenmemiştir.
 
 ## Saved scans
 
