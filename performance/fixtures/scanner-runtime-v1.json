@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "seed": "atlas-scanner-performance-v1",
+  "instrumentCount": 600,
+  "shortHistoryInstrumentCount": 10,
+  "dailyBarsPerInstrument": 60,
+  "hourlyBarsPerInstrument": 60,
+  "shortHistoryBarsPerTimeframe": 5,
+  "timeframes": ["1d", "1h"],
+  "market": "BIST",
+  "externalProvider": false
+}

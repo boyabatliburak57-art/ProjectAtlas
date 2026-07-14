@@ -1,0 +1,35 @@
+{
+  "PERF-SCN-001": {
+    "coldP95Ms": 2000,
+    "warmP95Ms": 750,
+    "maximumErrors": 0
+  },
+  "PERF-SCN-002": {
+    "p95Ms": 8000,
+    "maximumErrors": 0,
+    "maximumDuplicateResults": 0,
+    "requiredProgressMonotonicityPercent": 100
+  },
+  "PERF-SCN-003": {
+    "p95Ms": 15000,
+    "maximumErrors": 0,
+    "maximumWorkerCrashes": 0,
+    "maximumHeapGrowthBytes": 134217728
+  },
+  "PERF-SCN-004": {
+    "p95Ms": 300,
+    "maximumErrors": 0,
+    "maximumDuplicateOrMissingRows": 0
+  },
+  "PERF-SCN-005": {
+    "p95Ms": 250,
+    "maximumErrors": 0,
+    "maximumUnauthorizedAccesses": 0,
+    "maximumTerminalChanges": 0
+  },
+  "PERF-SCN-006": {
+    "p95Ms": 300,
+    "maximumErrors": 0,
+    "maximumNewRuns": 0
+  }
+}

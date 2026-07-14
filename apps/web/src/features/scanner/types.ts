@@ -18,19 +18,28 @@ export interface OperatorDefinition {
   requiredOption?: 'period' | 'percent';
 }
 
+export interface IndicatorOperand {
+  type: 'indicator';
+  code: string;
+  version: number;
+  timeframe: Timeframe;
+  parameters: Record<string, unknown>;
+}
+
+export interface ConstantNumberOperand {
+  type: 'constantNumber';
+  value: number;
+}
+
+export type NumericOperand = IndicatorOperand | ConstantNumberOperand;
+
 export interface ConditionNode {
   type: 'condition';
   nodeId: string;
   operator: string;
-  left: {
-    type: 'indicator';
-    code: string;
-    version: number;
-    timeframe: Timeframe;
-    parameters: Record<string, unknown>;
-  };
-  right?: { type: 'constantNumber'; value: number };
-  upperBound?: { type: 'constantNumber'; value: number };
+  left: IndicatorOperand;
+  right?: NumericOperand;
+  upperBound?: ConstantNumberOperand;
   options?: { period?: number; percent?: number };
 }
 
@@ -91,7 +100,17 @@ export interface RunProgress {
 
 export interface ScanRun {
   id: string;
-  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelRequested' | 'cancelled' | 'expired';
+  status:
+    | 'queued'
+    | 'running'
+    | 'completed'
+    | 'failed'
+    | 'cancelRequested'
+    | 'cancelled'
+    | 'expired';
+  executionMode: 'sync' | 'async';
+  planVersion: number;
+  ruleVersion: number;
   progress: RunProgress;
   dataCutoffAt: string;
   errorCode: string | null;

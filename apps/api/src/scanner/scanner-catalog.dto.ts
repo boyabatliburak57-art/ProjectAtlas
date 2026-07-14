@@ -21,7 +21,10 @@ export class ScanOperatorListResponseDto {
   @ApiProperty({ type: [ScanOperatorDto] })
   data!: ScanOperatorDto[];
 
-  @ApiProperty({ type: 'object', properties: { requestId: { type: 'string' } } })
+  @ApiProperty({
+    type: 'object',
+    properties: { requestId: { type: 'string' } },
+  })
   meta!: { requestId: string };
 }
 
@@ -40,6 +43,9 @@ export class ScanValidationResponseDto {
   @ApiProperty()
   data!: Readonly<Record<string, unknown>>;
 
-  @ApiProperty({ type: 'object', properties: { requestId: { type: 'string' } } })
+  @ApiProperty({
+    type: 'object',
+    properties: { requestId: { type: 'string' } },
+  })
   meta!: { requestId: string };
 }

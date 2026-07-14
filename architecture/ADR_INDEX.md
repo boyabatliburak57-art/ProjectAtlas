@@ -13,13 +13,13 @@ Bu dosya Project Atlas mimari karar kayıtlarının resmi indeksidir.
 
 ## Mevcut kayıtlar
 
-| Kimlik | Başlık | Durum |
-|---|---|---|
-| ADR-001 | Modular Monolith ile Başlama | Accepted |
+| Kimlik  | Başlık                            | Durum    |
+| ------- | --------------------------------- | -------- |
+| ADR-001 | Modular Monolith ile Başlama      | Accepted |
 | ADR-002 | Backend için TypeScript ve NestJS | Accepted |
 | ADR-003 | Tarama Kuralları için Sürümlü AST | Accepted |
 | ADR-004 | Indicator Versioning and Fixtures | Accepted |
-| ADR-005 | Three-State Scan Evaluation | Accepted |
+| ADR-005 | Three-State Scan Evaluation       | Accepted |
 
 ## Çakışma düzeltme notu
 

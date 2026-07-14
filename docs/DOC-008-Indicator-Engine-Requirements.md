@@ -10,6 +10,7 @@ Indicator Engine, normalize edilmiş OHLCV serilerinden deterministik, test edil
 ## 2. İlk çekirdek indikatör seti
 
 ### Fiyat ve ortalamalar
+
 - SMA
 - EMA
 - WMA
@@ -17,6 +18,7 @@ Indicator Engine, normalize edilmiş OHLCV serilerinden deterministik, test edil
 - Momentum
 
 ### Momentum
+
 - RSI
 - Stochastic
 - Stochastic RSI
@@ -24,6 +26,7 @@ Indicator Engine, normalize edilmiş OHLCV serilerinden deterministik, test edil
 - Williams %R
 
 ### Trend ve volatilite
+
 - MACD
 - ATR
 - ADX
@@ -35,6 +38,7 @@ Indicator Engine, normalize edilmiş OHLCV serilerinden deterministik, test edil
 - Keltner Channel
 
 ### Hacim
+
 - OBV
 - CMF
 - MFI

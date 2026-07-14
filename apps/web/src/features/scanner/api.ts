@@ -63,8 +63,16 @@ export const scannerApi = {
     return { items: body.data.items, nextCursor: body.meta.nextCursor ?? null };
   },
   cancel: (id: string) =>
-    request<ScanRun>(`/scanner/runs/${id}/cancel`, { method: 'POST', body: '{}' }),
-  save: (input: { name: string; description: string; tags: string[]; rule: ScanRule }) =>
+    request<ScanRun>(`/scanner/runs/${id}/cancel`, {
+      method: 'POST',
+      body: '{}',
+    }),
+  save: (input: {
+    name: string;
+    description: string;
+    tags: string[];
+    rule: ScanRule;
+  }) =>
     request<{ id: string; currentRevision: number }>('/saved-scans', {
       method: 'POST',
       body: JSON.stringify(input),

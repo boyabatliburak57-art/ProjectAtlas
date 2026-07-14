@@ -26,7 +26,6 @@ TASK-001–011F Foundation; TASK-012–020 Indicator/Scanner Core; TASK-021 core
 
 Project Constitution > Accepted ADR > Security/Quality > Software/Engine/Runtime requirements > Architecture/DB/API > Product/UX > Task card > code comments.
 
-
 ## v0.4.1 Indicator/Scanner Core Remediation Gate
 
 1. `tasks/TASK-021A-ADR-006-Collision-Remediation.md`
@@ -39,7 +38,6 @@ Referanslar:
 - `docs/DOC-014-Documentation-Identifier-and-Formatting-Policy.md`
 
 TASK-021C sonucu GO olmadan TASK-022 uygulanmaz.
-
 
 ## v0.4.2 Scanner Runtime Remediation Gate
 

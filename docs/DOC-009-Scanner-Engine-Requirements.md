@@ -66,6 +66,7 @@ AST içinde SQL, JavaScript veya çalıştırılabilir expression bulunamaz.
 ## 5. İlk operatör seti
 
 ### Scalar
+
 - EQ
 - NE
 - GT
@@ -76,10 +77,12 @@ AST içinde SQL, JavaScript veya çalıştırılabilir expression bulunamaz.
 - OUTSIDE
 
 ### Geçiş
+
 - CROSSES_ABOVE
 - CROSSES_BELOW
 
 ### Seri
+
 - HIGHEST_IN_PERIOD
 - LOWEST_IN_PERIOD
 - INCREASED_BY_PERCENT
@@ -87,6 +90,7 @@ AST içinde SQL, JavaScript veya çalıştırılabilir expression bulunamaz.
 - WITHIN_PERCENT_OF
 
 ### Boolean
+
 - IS_TRUE
 - IS_FALSE
 
@@ -112,11 +116,13 @@ Her node sonucu:
 olur.
 
 ### AND
+
 - herhangi bir child notMatched ise notMatched
 - tüm child matched ise matched
 - diğer durumda notEvaluable
 
 ### OR
+
 - herhangi bir child matched ise matched
 - tüm child notMatched ise notMatched
 - diğer durumda notEvaluable

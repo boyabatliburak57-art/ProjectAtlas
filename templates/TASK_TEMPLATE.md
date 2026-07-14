@@ -1,7 +1,7 @@
 # TASK-XXX — Başlık
 
 **Durum:** Taslak  
-**Bağımlılık:**  
+**Bağımlılık:**
 
 ## Amaç
 

@@ -17,6 +17,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "turbo run lint",
+    "perf:scanner": "bash scripts/run-scanner-performance.sh",
     "preinstall": "node scripts/check-toolchain-versions.mjs --node-only",
     "secret:scan": "bash scripts/secret-scan.sh --all",
     "secret:scan:test": "bash scripts/test-secret-scan.sh",

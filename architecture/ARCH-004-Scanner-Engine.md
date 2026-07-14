@@ -45,7 +45,7 @@ interface ScanExecutionPlan {
   indicatorRequests: readonly PlannedIndicatorRequest[];
   normalizedRule: ScanRuleAst;
   complexity: ScanComplexity;
-  executionMode: "sync" | "async";
+  executionMode: 'sync' | 'async';
 }
 ```
 
