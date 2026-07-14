@@ -1,6 +1,6 @@
 # TASK-011E — Market Data Worker Composition Root Wiring
 
-**Durum:** Hazır
+**Durum:** Hazır  
 **Bağımlılık:** TASK-011D
 
 ## Amaç

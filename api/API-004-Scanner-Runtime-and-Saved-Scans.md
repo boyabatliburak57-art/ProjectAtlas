@@ -9,10 +9,6 @@
 
 `Idempotency-Key` zorunlu veya sunucu politikasınca zorunlu tutulur.
 
-TASK-025 uygulamasında zorunludur. Yeni run `201`, aynı normalize istek replay'i `200`
-yanıtında `meta.replayed` alanıyla ayrılır. Oluşturulan run deterministik BullMQ job kimliğiyle
-scanner queue'ya gönderilir.
-
 - 201: yeni run
 - 200: idempotent replay
 - 409: key farklı request ile yeniden kullanıldı
@@ -29,37 +25,15 @@ scanner queue'ya gönderilir.
 
 Cursor pagination; status, sort, direction ve includeExplanation parametreleri. Detaylı explanation varsayılan olarak lazy yüklenebilir.
 
-- `limit`: 1–100, varsayılan 25
-- `status`: `matched` veya `notEvaluable`
-- `sort`: `createdAt` veya `rank`
-- `direction`: `asc` veya `desc`
-- `includeExplanation`: varsayılan `false`
-- `cursor`: opaque base64url cursor; geçersiz cursor `SCAN_RESULTS_CURSOR_INVALID`
-
 ## Cancel
 
 `POST /scanner/runs/{runId}/cancel`
 
 İdempotent. Terminal run için `SCAN_RUN_NOT_CANCELLABLE`.
 
-Run, result ve cancel endpointleri authenticated user kimliğini yalnızca güvenilir backend auth
-context'inden alır. İstemci tarafından gönderilen user ID ownership kanıtı olarak kullanılmaz.
-
 ## Progress
 
-İlk sürüm `GET /scanner/runs/{runId}` polling kullanır. Progress; total, processed,
-matched, notEvaluable, warnings, phase, percent ve updatedAt alanlarına ek olarak aşağıdaki
-delivery metadata'sını taşır:
-
-- `source`: `redis` fast-path veya `postgresql` durable fallback
-- `stale`: seçilen snapshot stale threshold'u aşmışsa `true`
-- `terminal`: terminal run durumunda `true`
-- `pollAfterMs`: aktif run için önerilen polling aralığı; terminal durumda `null`
-
-Sayaçlar ve `updatedAt` monoton bir watermark ile geriye gitmez. Terminal snapshot sabitlenir
-ve Redis tekrar okunmaz. Redis unavailable, eksik, geçersiz veya durable snapshot'ın gerisindeyse
-PostgreSQL kullanılır. Ownership kontrolü progress kaynakları okunmadan önce yapılır. WebSocket
-eklenmemiştir.
+İlk sürüm polling. Gerekli görülürse SSE eklenir; WebSocket zorunlu değildir.
 
 ## Saved scans
 

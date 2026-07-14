@@ -1,6 +1,6 @@
 # TASK-011C — Secret Scanning and CI Gate
 
-**Durum:** Hazır
+**Durum:** Hazır  
 **Bağımlılık:** TASK-011B
 
 ## Amaç

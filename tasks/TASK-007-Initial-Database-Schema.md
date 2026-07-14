@@ -1,6 +1,6 @@
 # TASK-007 — Initial Database Schema
 
-**Durum:** Hazır
+**Durum:** Hazır  
 **Bağımlılık:** TASK-005
 
 ## Amaç

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.2-scanner-runtime-remediation — 2026-07-14
+
+### Eklendi
+
+- Scanner Runtime remediation plan
+- DOC-015 Scanner Performance and E2E Quality Gates
+- Scanner Performance Baseline Guide
+- TASK-030A Scanner Formatting Remediation
+- TASK-030B Scanner Performance Baseline
+- TASK-030C Custom Scan AST Round-Trip E2E
+- TASK-030D Scanner Runtime Re-Audit
+
+### Değişti
+
+- Scanner Runtime milestone sonrası zorunlu remediation geçiş kapısı eklendi.
+- README ve ATLAS_INDEX güncellendi.
+
 ## 0.4.1-runtime-remediation — 2026-07-11
 
 ### Eklendi
@@ -13,8 +30,6 @@
 ### Değişti
 
 - TASK-022 öncesine zorunlu repository gate remediation eklendi.
-- Resmî index dışında kalan Drizzle kararı, içeriği ve tarihi korunarak `ADR-006` kimliğinden
-  `ADR-008` kimliğine taşındı; `ADR-006` Scan Run kararına ayrıldı.
 
 ## 0.4.0-scanner-runtime — 2026-07-11
 

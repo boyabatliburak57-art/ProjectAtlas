@@ -1,7 +1,5 @@
 # TASK-019 — Scanner Operators and Evaluator
 
-**Durum:** Tamamlandı
-
 **Bağımlılık:** TASK-018
 
 ## Operatörler

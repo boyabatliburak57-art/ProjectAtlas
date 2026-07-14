@@ -1,6 +1,6 @@
 # TASK-009 — BIST Instrument Import Pipeline
 
-**Durum:** Hazır
+**Durum:** Hazır  
 **Bağımlılık:** TASK-008
 
 ## Amaç

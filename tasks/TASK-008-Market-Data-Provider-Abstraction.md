@@ -1,6 +1,6 @@
 # TASK-008 — Market Data Provider Abstraction
 
-**Durum:** Hazır
+**Durum:** Hazır  
 **Bağımlılık:** TASK-006, TASK-007
 
 ## Amaç

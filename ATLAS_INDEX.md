@@ -26,6 +26,7 @@ TASK-001–011F Foundation; TASK-012–020 Indicator/Scanner Core; TASK-021 core
 
 Project Constitution > Accepted ADR > Security/Quality > Software/Engine/Runtime requirements > Architecture/DB/API > Product/UX > Task card > code comments.
 
+
 ## v0.4.1 Indicator/Scanner Core Remediation Gate
 
 1. `tasks/TASK-021A-ADR-006-Collision-Remediation.md`
@@ -36,6 +37,21 @@ Referanslar:
 
 - `reports/REMEDIATION_PLAN-v0.4.1.md`
 - `docs/DOC-014-Documentation-Identifier-and-Formatting-Policy.md`
-- `architecture/ADR-008-Drizzle-PostgreSQL-Data-Access.md`
 
 TASK-021C sonucu GO olmadan TASK-022 uygulanmaz.
+
+
+## v0.4.2 Scanner Runtime Remediation Gate
+
+1. `tasks/TASK-030A-Scanner-Formatting-Remediation.md`
+2. `tasks/TASK-030B-Scanner-Performance-Baseline.md`
+3. `tasks/TASK-030C-Custom-Scan-AST-Roundtrip-E2E.md`
+4. `tasks/TASK-030D-Scanner-Runtime-Reaudit.md`
+
+Referanslar:
+
+- `reports/REMEDIATION_PLAN-v0.4.2.md`
+- `docs/DOC-015-Scanner-Performance-and-E2E-Quality-Gates.md`
+- `guides/SCANNER_PERFORMANCE_BASELINE_GUIDE.md`
+
+TASK-030D sonucu GO olmadan sonraki pakete geçilmez.

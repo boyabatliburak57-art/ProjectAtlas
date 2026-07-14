@@ -1,6 +1,5 @@
 # TASK-018 — Scanner AST and Validation
 
-**Durum:** Tamamlandı
 **Bağımlılık:** TASK-016
 
 ## Kapsam

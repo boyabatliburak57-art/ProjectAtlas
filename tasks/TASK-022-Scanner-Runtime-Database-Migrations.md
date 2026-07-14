@@ -1,7 +1,5 @@
 # TASK-022 — Scanner Runtime Database Migrations
 
-**Durum:** Tamamlandı
-
 **Bağımlılık:** TASK-021
 
 DB-003 ve DB-004'e göre scan categories, saved scans/revisions/tags, preset scans/revisions, scan runs, batches, results ve events migration'larını oluştur.

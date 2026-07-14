@@ -1,6 +1,6 @@
 # TASK-010 — OHLCV Ingestion Core
 
-**Durum:** Hazır
+**Durum:** Hazır  
 **Bağımlılık:** TASK-008, TASK-009
 
 ## Amaç

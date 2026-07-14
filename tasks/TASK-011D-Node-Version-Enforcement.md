@@ -1,6 +1,6 @@
 # TASK-011D — Node Version Enforcement
 
-**Durum:** Hazır
+**Durum:** Hazır  
 **Bağımlılık:** TASK-011C
 
 ## Amaç

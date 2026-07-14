@@ -1,6 +1,6 @@
 # TASK-005 — API Application Scaffold
 
-**Durum:** Hazır
+**Durum:** Hazır  
 **Bağımlılık:** TASK-002, TASK-003
 
 ## Amaç

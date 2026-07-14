@@ -1,7 +1,5 @@
 # TASK-023 — Scan Run Application Service
 
-**Durum:** Tamamlandı
-
 **Bağımlılık:** TASK-020, TASK-022
 
 Run create, idempotency, request hash, entitlement, execution plan persistence, universe snapshot, data cutoff, ownership, cancellation ve state transitions application service'lerini oluştur.

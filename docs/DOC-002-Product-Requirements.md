@@ -115,19 +115,15 @@ Her hazır tarama ad, açıklama, koşullar, kullanıcı seviyesi, veri gereksin
 ## 7. İlk indikatör seti
 
 ### Trend
-
 SMA, EMA, WMA, HMA, Supertrend, ADX, DMI, Parabolic SAR, Ichimoku temel bileşenleri.
 
 ### Momentum
-
 RSI, Stochastic, Stochastic RSI, MACD, CCI, ROC, Williams %R, MFI.
 
 ### Hacim
-
 OBV, CMF, VWAP, Volume SMA, Relative Volume, Accumulation/Distribution.
 
 ### Volatilite
-
 ATR, Bollinger Bands, Keltner Channel, Standard Deviation, Donchian Channel.
 
 ## 8. Kayıtlı taramalar
@@ -164,19 +160,15 @@ Manuel işlem girişi, adet, maliyet, gerçekleşen/gerçekleşmemiş kâr-zarar
 ## 13. Paketler
 
 ### Guest
-
 Sınırlı dashboard ve hazır tarama.
 
 ### Free
-
 Watchlist, sınırlı kayıtlı tarama ve alarm.
 
 ### Premium
-
 Daha yüksek kotalar, gelişmiş indikatörler, çoklu zaman dilimi, dışa aktarma ve backtest erişimi.
 
 ### Admin
-
 Kullanıcı, yetki, hazır tarama, veri sağlayıcı ve sistem sağlık yönetimi.
 
 ## 14. Ana kullanıcı hikâyeleri

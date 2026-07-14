@@ -1,6 +1,5 @@
 # TASK-017 — Indicator Catalog API
 
-**Durum:** Tamamlandı
 **Bağımlılık:** TASK-016
 
 ## Endpointler

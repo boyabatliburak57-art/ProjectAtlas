@@ -1,6 +1,6 @@
 # TASK-011F — Foundation Re-Audit Gate
 
-**Durum:** Hazır
+**Durum:** Hazır  
 **Bağımlılık:** TASK-011A–TASK-011E
 
 ## Amaç

@@ -48,6 +48,7 @@ Project Atlas, Borsa İstanbul (BIST) paylarını teknik ve temel verilerle tara
 - Instrument ve bar API taslağı
 - TASK-004 ile TASK-010 arası uygulama görevleri
 
+
 ## v0.3 ile eklenenler
 
 - Indicator Engine gereksinimleri ve mimarisi
@@ -57,11 +58,13 @@ Project Atlas, Borsa İstanbul (BIST) paylarını teknik ve temel verilerle tara
 - Indicator/scanner veri modeli ve API taslağı
 - TASK-011–TASK-020
 
+
 ## v0.3.1 geçiş kuralı
 
 Foundation audit NO-GO sonucu nedeniyle Indicator Engine görevleri geçici olarak durdurulmuştur.
 
 Önce TASK-011A ile TASK-011F uygulanır. Re-audit GO sonucu vermeden TASK-012 başlatılmaz.
+
 
 ## v0.4 ile eklenenler
 
@@ -70,6 +73,20 @@ Foundation audit NO-GO sonucu nedeniyle Indicator Engine görevleri geçici olar
 - Scanner runtime API ve UX
 - TASK-021–TASK-030
 
+
 ## v0.4.1 geçiş kuralı
 
 TASK-021A, TASK-021B ve TASK-021C tamamlanıp re-audit GO sonucu vermeden TASK-022 başlatılmaz.
+
+
+## v0.4.2 geçiş kuralı
+
+Scanner Runtime milestone audit sonucu NO-GO'dur.
+
+Açık bulgular:
+
+- F-001: sekiz scanner dosyasında format farkı
+- D-001: ölçülebilir performance baseline ve threshold eksikliği
+- D-002: custom scan AST request round-trip E2E eksikliği
+
+TASK-030A, TASK-030B, TASK-030C ve TASK-030D tamamlanıp re-audit GO vermeden sonraki pakete geçilmez.

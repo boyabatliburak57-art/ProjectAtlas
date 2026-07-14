@@ -1,7 +1,5 @@
 # TASK-025 — Scanner Runtime API
 
-**Durum:** Tamamlandı
-
 **Bağımlılık:** TASK-023, TASK-024
 
 Run create/status/results/cancel endpointlerini API-004'e göre oluştur. Idempotency, pagination, ownership, error mapping, OpenAPI ve API testleri ekle.

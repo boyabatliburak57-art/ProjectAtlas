@@ -1,6 +1,6 @@
 # TASK-021A — ADR-006 Collision Remediation
 
-**Durum:** Tamamlandı  
+**Durum:** Hazır  
 **Bağımlılık:** TASK-021 NO-GO raporu
 
 ## Amaç

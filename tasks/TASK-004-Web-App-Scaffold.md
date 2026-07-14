@@ -1,6 +1,6 @@
 # TASK-004 — Web Application Scaffold
 
-**Durum:** Hazır
+**Durum:** Hazır  
 **Bağımlılık:** TASK-002
 
 ## Amaç

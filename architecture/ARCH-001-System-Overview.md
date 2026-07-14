@@ -23,39 +23,30 @@ flowchart LR
 ## 2. Modüller
 
 ### Identity & Access
-
 Kayıt, giriş, oturum, rol, entitlement ve hesap durumu.
 
 ### Instrument Master
-
 Sembol, şirket, sektör, pazar, endeks, sembol geçmişi ve kurumsal aksiyon.
 
 ### Market Data
-
 Provider adapter, ingestion, normalizasyon, bar yaşam döngüsü, stale detection ve kalite kontrolü.
 
 ### Indicator Engine
-
 Registry, parametre doğrulama, warm-up, batch hesaplama, cache ve referans testleri.
 
 ### Scanner Engine
-
 Kural AST doğrulama, execution plan, koşul değerlendirme, açıklama ve karmaşıklık kontrolü.
 
 ### Alerts
-
 Kural bağlama, planlama, trigger state, deduplication, bildirim ve teslimat geçmişi.
 
 ### Portfolio
-
 Manuel işlemler, pozisyon, değerleme, gerçekleşen/gerçekleşmemiş kâr-zarar ve dağılım.
 
 ### Billing & Entitlements
-
 Plan, özellik, kota, abonelik ve kullanım sayacı.
 
 ### Admin
-
 Kullanıcı, provider, hazır tarama, sistem sağlık ve audit yönetimi.
 
 ## 3. Modül bağımlılıkları

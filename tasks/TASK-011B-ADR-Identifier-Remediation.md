@@ -1,6 +1,6 @@
 # TASK-011B — ADR Identifier Remediation
 
-**Durum:** Hazır
+**Durum:** Hazır  
 **Bağımlılık:** TASK-011A
 
 ## Amaç
