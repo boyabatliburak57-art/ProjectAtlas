@@ -54,6 +54,20 @@ const alertsWatchlistsNotificationTables = [
   'watchlists',
 ] as const;
 
+const portfolioTables = [
+  'portfolio_cash_balances',
+  'portfolio_import_jobs',
+  'portfolio_import_rows',
+  'portfolio_performance_snapshots',
+  'portfolio_position_snapshots',
+  'portfolio_positions',
+  'portfolio_risk_exposures',
+  'portfolio_risk_snapshots',
+  'portfolio_transactions',
+  'portfolio_valuation_snapshots',
+  'portfolios',
+] as const;
+
 describe('PostgreSQL migrations', () => {
   const { db, pool } = createDatabase(requireTestDatabaseUrl());
 
@@ -69,7 +83,7 @@ describe('PostgreSQL migrations', () => {
     await pool.end();
   });
 
-  it('clean-migrates exactly the thirty domain tables', async () => {
+  it('clean-migrates exactly the forty-one domain tables', async () => {
     const result = await pool.query<{ table_name: string }>(`
       select table_name
       from information_schema.tables
@@ -92,6 +106,17 @@ describe('PostgreSQL migrations', () => {
       'notification_outbox',
       'notification_preferences',
       'notifications',
+      'portfolio_cash_balances',
+      'portfolio_import_jobs',
+      'portfolio_import_rows',
+      'portfolio_performance_snapshots',
+      'portfolio_position_snapshots',
+      'portfolio_positions',
+      'portfolio_risk_exposures',
+      'portfolio_risk_snapshots',
+      'portfolio_transactions',
+      'portfolio_valuation_snapshots',
+      'portfolios',
       'preset_scan_revisions',
       'preset_scans',
       'price_bars',
@@ -535,7 +560,335 @@ describe('PostgreSQL migrations', () => {
     ]);
   });
 
+  it('enforces portfolio ownership, transaction idempotency and same-portfolio reversals', async () => {
+    const ownerUserId = randomUUID();
+    const otherUserId = randomUUID();
+    const portfolio = await pool.query<{ id: string }>(
+      `insert into portfolios (user_id, name)
+       values ($1, 'Ledger Portfolio') returning id`,
+      [ownerUserId],
+    );
+    const otherPortfolio = await pool.query<{ id: string }>(
+      `insert into portfolios (user_id, name)
+       values ($1, 'Other Portfolio') returning id`,
+      [otherUserId],
+    );
+    const instrument = await pool.query<{ id: string }>(`
+      insert into instruments
+        (symbol, normalized_symbol, name, market_code, currency_code, status)
+      values ('PORT1', 'PORT1', 'Portfolio Instrument', 'BIST', 'TRY', 'active')
+      returning id
+    `);
+    const portfolioId = portfolio.rows[0]!.id;
+    const instrumentId = instrument.rows[0]!.id;
+    const transactionInsert = `insert into portfolio_transactions
+      (portfolio_id, instrument_id, type, status, trade_at, quantity,
+       unit_price, fee, tax, source, external_reference,
+       idempotency_key_hash, normalized_transaction_hash, created_by, posted_at)
+      values ($1, $2, 'buy', 'posted', '2026-07-15T10:00:00Z', '10.5',
+              '100.25', '1.25', '0', 'manual', 'broker-1',
+              'idempotency-1', 'normalized-1', $3, '2026-07-15T10:01:00Z')
+      returning id`;
+    const transaction = await pool.query<{ id: string }>(transactionInsert, [
+      portfolioId,
+      instrumentId,
+      ownerUserId,
+    ]);
+    const transactionId = transaction.rows[0]!.id;
+
+    await expect(
+      pool.query(
+        `insert into portfolio_transactions
+          (portfolio_id, type, trade_at, source, idempotency_key_hash,
+           normalized_transaction_hash, created_by)
+         values ($1, 'cashDeposit', now(), 'manual', 'missing-portfolio',
+                 'missing-portfolio', $2)`,
+        [randomUUID(), ownerUserId],
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
+
+    await expect(
+      pool.query(
+        `insert into portfolio_transactions
+          (portfolio_id, instrument_id, type, status, trade_at, quantity,
+           unit_price, source, idempotency_key_hash,
+           normalized_transaction_hash, created_by, posted_at)
+         values ($1, $2, 'buy', 'posted', '2026-07-15T11:00:00Z', '1',
+                 '101', 'manual', 'idempotency-1', 'normalized-other', $3, now())`,
+        [portfolioId, instrumentId, ownerUserId],
+      ),
+    ).rejects.toMatchObject({ code: '23505' });
+
+    await expect(
+      pool.query(
+        `insert into portfolio_transactions
+          (portfolio_id, instrument_id, type, status, trade_at, quantity,
+           unit_price, source, external_reference, idempotency_key_hash,
+           normalized_transaction_hash, created_by, posted_at)
+         values ($1, $2, 'buy', 'posted', '2026-07-15T11:00:00Z', '1',
+                 '101', 'manual', 'broker-1', 'idempotency-other',
+                 'normalized-1', $3, now())`,
+        [portfolioId, instrumentId, ownerUserId],
+      ),
+    ).rejects.toMatchObject({ code: '23505' });
+
+    await expect(
+      pool.query(
+        `insert into portfolio_transactions
+          (portfolio_id, reversal_of_transaction_id, type, status, trade_at,
+           quantity, unit_price, source, idempotency_key_hash,
+           normalized_transaction_hash, created_by, posted_at)
+         values ($1, $2, 'buy', 'posted', now(), '10.5', '100.25', 'system',
+                 'cross-reversal', 'cross-reversal', $3, now())`,
+        [otherPortfolio.rows[0]!.id, transactionId, otherUserId],
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
+
+    const reversalInsert = `insert into portfolio_transactions
+      (portfolio_id, instrument_id, reversal_of_transaction_id, type, status,
+       trade_at, quantity, unit_price, fee, tax, source,
+       idempotency_key_hash, normalized_transaction_hash, created_by, posted_at)
+      values ($1, $2, $3, 'buy', 'posted', '2026-07-15T12:00:00Z', '10.5',
+              '100.25', '1.25', '0', 'system', 'reversal-1',
+              'reversal-normalized-1', $4, '2026-07-15T12:01:00Z')`;
+    await pool.query(reversalInsert, [
+      portfolioId,
+      instrumentId,
+      transactionId,
+      ownerUserId,
+    ]);
+    await expect(
+      pool.query(reversalInsert, [
+        portfolioId,
+        instrumentId,
+        transactionId,
+        ownerUserId,
+      ]),
+    ).rejects.toMatchObject({ code: '23505' });
+
+    await expect(
+      pool.query(
+        `update portfolio_transactions set note = 'mutated' where id = $1`,
+        [transactionId],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+    await pool.query(
+      `update portfolio_transactions
+       set status = 'reversed', reversed_at = now(), updated_at = now()
+       where id = $1`,
+      [transactionId],
+    );
+    await expect(
+      pool.query(`delete from portfolio_transactions where id = $1`, [
+        transactionId,
+      ]),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('rejects duplicate positions and invalid or overflowing numeric values', async () => {
+    const ownerUserId = randomUUID();
+    await expect(
+      pool.query(
+        `insert into portfolios (user_id, name, reporting_currency)
+         values ($1, 'Unsupported Currency', 'USD')`,
+        [ownerUserId],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+    const portfolio = await pool.query<{ id: string }>(
+      `insert into portfolios (user_id, name)
+       values ($1, 'Numeric Portfolio') returning id`,
+      [ownerUserId],
+    );
+    const instrument = await pool.query<{ id: string }>(`
+      insert into instruments
+        (symbol, normalized_symbol, name, market_code, currency_code, status)
+      values ('PORT2', 'PORT2', 'Numeric Instrument', 'BIST', 'TRY', 'active')
+      returning id
+    `);
+    const values = [portfolio.rows[0]!.id, instrument.rows[0]!.id];
+    const positionInsert = `insert into portfolio_positions
+      (portfolio_id, instrument_id, quantity, average_cost, cost_basis,
+       projection_ledger_version, calculated_at)
+      values ($1, $2, '5.1234567890', '10.1234567890', '51.2654320927', 1, now())`;
+    await pool.query(positionInsert, values);
+    await expect(pool.query(positionInsert, values)).rejects.toMatchObject({
+      code: '23505',
+    });
+
+    await expect(
+      pool.query(
+        `insert into portfolio_cash_balances
+          (portfolio_id, currency_code, balance, projection_ledger_version,
+           calculated_at)
+         values ($1, 'TRY', 'not-a-decimal', 1, now())`,
+        [portfolio.rows[0]!.id],
+      ),
+    ).rejects.toMatchObject({ code: '22P02' });
+    await expect(
+      pool.query(
+        `insert into portfolio_cash_balances
+          (portfolio_id, currency_code, balance, projection_ledger_version,
+           calculated_at)
+         values ($1, 'TRY', 'NaN', 1, now())`,
+        [portfolio.rows[0]!.id],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+    await expect(
+      pool.query(
+        `insert into portfolio_cash_balances
+          (portfolio_id, currency_code, balance, projection_ledger_version,
+           calculated_at)
+         values ($1, 'TRY', '1000000000000000000', 1, now())`,
+        [portfolio.rows[0]!.id],
+      ),
+    ).rejects.toMatchObject({ code: '22003' });
+  });
+
+  it('enforces ledger and policy versions in snapshot identities', async () => {
+    const ownerUserId = randomUUID();
+    const portfolio = await pool.query<{ id: string }>(
+      `insert into portfolios (user_id, name)
+       values ($1, 'Snapshot Portfolio') returning id`,
+      [ownerUserId],
+    );
+    const portfolioId = portfolio.rows[0]!.id;
+    const valuationInsert = `insert into portfolio_valuation_snapshots
+      (portfolio_id, ledger_version, valuation_at, data_cutoff_at,
+       price_policy_version, status, cash_balance, positions_market_value,
+       total_value, realized_pnl, unrealized_pnl)
+      values ($1, 3, '2026-07-16T18:00:00Z', '2026-07-16T15:00:00Z',
+              'close-v1', 'complete', '100', '250', '350', '10', '20')`;
+    await pool.query(valuationInsert, [portfolioId]);
+    await expect(
+      pool.query(valuationInsert, [portfolioId]),
+    ).rejects.toMatchObject({ code: '23505' });
+
+    const performanceInsert = `insert into portfolio_performance_snapshots
+      (portfolio_id, ledger_version, range_start_at, range_end_at,
+       data_cutoff_at, performance_policy_version, benchmark_code, status,
+       twr, xirr, net_contribution, start_value, end_value, observation_count)
+      values ($1, 3, '2026-01-01T00:00:00Z', '2026-07-16T00:00:00Z',
+              '2026-07-16T15:00:00Z', 'returns-v1', 'XU100', 'complete',
+              '0.10', '0.08', '100', '1000', '1200', 140)`;
+    await pool.query(performanceInsert, [portfolioId]);
+    await expect(
+      pool.query(performanceInsert, [portfolioId]),
+    ).rejects.toMatchObject({ code: '23505' });
+
+    const riskInsert = `insert into portfolio_risk_snapshots
+      (portfolio_id, ledger_version, valuation_series_version,
+       range_start_at, range_end_at, data_cutoff_at, benchmark_code,
+       risk_policy_version, status, observation_count, volatility,
+       historical_var_95)
+      values ($1, 3, 2, '2026-01-01T00:00:00Z', '2026-07-16T00:00:00Z',
+              '2026-07-16T15:00:00Z', 'XU100', 'risk-v1', 'complete', 140,
+              '0.20', '0.03')`;
+    await pool.query(riskInsert, [portfolioId]);
+    await expect(pool.query(riskInsert, [portfolioId])).rejects.toMatchObject({
+      code: '23505',
+    });
+  });
+
+  it('enforces import job and row ownership with duplicate analysis fields', async () => {
+    const ownerUserId = randomUUID();
+    const otherUserId = randomUUID();
+    const portfolio = await pool.query<{ id: string }>(
+      `insert into portfolios (user_id, name)
+       values ($1, 'Import Portfolio') returning id`,
+      [ownerUserId],
+    );
+    const portfolioId = portfolio.rows[0]!.id;
+    const jobInsert = `insert into portfolio_import_jobs
+      (portfolio_id, user_id, status, source_filename, file_hash,
+       idempotency_key_hash, total_row_count, valid_row_count)
+      values ($1, $2, 'preview_ready', 'transactions.csv', 'file-hash-1',
+              'import-key-1', 1, 1)
+      returning id`;
+
+    await expect(
+      pool.query(jobInsert, [portfolioId, otherUserId]),
+    ).rejects.toMatchObject({ code: '23503' });
+    const job = await pool.query<{ id: string }>(jobInsert, [
+      portfolioId,
+      ownerUserId,
+    ]);
+    await expect(
+      pool.query(jobInsert, [portfolioId, ownerUserId]),
+    ).rejects.toMatchObject({ code: '23505' });
+
+    await expect(
+      pool.query(
+        `insert into portfolio_import_rows
+          (import_job_id, portfolio_id, user_id, row_number, status,
+           normalized_transaction_hash)
+         values ($1, $2, $3, 1, 'valid', 'row-hash-1')`,
+        [job.rows[0]!.id, portfolioId, otherUserId],
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
+    await pool.query(
+      `insert into portfolio_import_rows
+        (import_job_id, portfolio_id, user_id, row_number, status,
+         normalized_transaction_hash)
+       values ($1, $2, $3, 1, 'valid', 'row-hash-1')`,
+      [job.rows[0]!.id, portfolioId, ownerUserId],
+    );
+    await expect(
+      pool.query(
+        `insert into portfolio_import_rows
+          (import_job_id, portfolio_id, user_id, row_number, status,
+           normalized_transaction_hash)
+         values ($1, $2, $3, 1, 'valid', 'row-hash-1')`,
+        [job.rows[0]!.id, portfolioId, ownerUserId],
+      ),
+    ).rejects.toMatchObject({ code: '23505' });
+  });
+
+  it('uses timestamptz for every portfolio time column', async () => {
+    const result = await pool.query<{
+      table_name: string;
+      column_name: string;
+      data_type: string;
+    }>(
+      `select table_name, column_name, data_type
+       from information_schema.columns
+       where table_schema = 'public'
+         and table_name = any($1::text[])
+         and (column_name like '%\\_at' escape '\\' or column_name like '%\\_time' escape '\\')
+       order by table_name, column_name`,
+      [portfolioTables],
+    );
+
+    expect(result.rows.length).toBeGreaterThan(0);
+    expect(new Set(result.rows.map(({ data_type }) => data_type))).toEqual(
+      new Set(['timestamp with time zone']),
+    );
+  });
+
   it('executes the documented destructive rollback and reapplies forward', async () => {
+    const valuationRollbackSql = await readFile(
+      resolve(migrationFolder(), 'rollback/0005_serious_corsair.down.sql'),
+      'utf8',
+    );
+    await pool.query(valuationRollbackSql);
+
+    const portfolioRollbackSql = await readFile(
+      resolve(
+        migrationFolder(),
+        'rollback/0004_portfolio_transactions_risk.down.sql',
+      ),
+      'utf8',
+    );
+    await pool.query(portfolioRollbackSql);
+
+    const portfoliosRolledBack = await pool.query<{ table_name: string }>(
+      `
+      select table_name from information_schema.tables
+      where table_schema = 'public' and table_name = any($1::text[])
+    `,
+      [portfolioTables],
+    );
+    expect(portfoliosRolledBack.rows).toEqual([]);
+
     const alertsRollbackSql = await readFile(
       resolve(
         migrationFolder(),
@@ -574,7 +927,7 @@ describe('PostgreSQL migrations', () => {
       where created_at in (
         select created_at from drizzle.__drizzle_migrations
         order by created_at desc
-        limit 2
+        limit 4
       )
     `);
     await runMigrations(db);
@@ -602,5 +955,17 @@ describe('PostgreSQL migrations', () => {
     expect(alertsReapplied.rows.map(({ table_name }) => table_name)).toEqual(
       [...alertsWatchlistsNotificationTables].sort(),
     );
+
+    const portfoliosReapplied = await pool.query<{ table_name: string }>(
+      `
+      select table_name from information_schema.tables
+      where table_schema = 'public' and table_name = any($1::text[])
+      order by table_name
+    `,
+      [portfolioTables],
+    );
+    expect(
+      portfoliosReapplied.rows.map(({ table_name }) => table_name),
+    ).toEqual([...portfolioTables].sort());
   });
 });

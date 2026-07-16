@@ -16,6 +16,17 @@ import {
   notificationOutbox,
   notificationPreferences,
   notifications,
+  portfolioCashBalances,
+  portfolioImportJobs,
+  portfolioImportRows,
+  portfolioPerformanceSnapshots,
+  portfolioPositions,
+  portfolioPositionSnapshots,
+  portfolioRiskExposures,
+  portfolioRiskSnapshots,
+  portfolios,
+  portfolioTransactions,
+  portfolioValuationSnapshots,
   priceBars,
   providerInstrumentMappings,
   presetScanRevisions,
@@ -116,6 +127,36 @@ describe('initial database schema', () => {
       'notification_preferences',
       'notification_deliveries',
       'notification_outbox',
+    ]);
+  });
+
+  it('exports the eleven portfolio, transaction, projection and risk tables', () => {
+    expect(
+      [
+        portfolios,
+        portfolioTransactions,
+        portfolioPositions,
+        portfolioCashBalances,
+        portfolioValuationSnapshots,
+        portfolioPositionSnapshots,
+        portfolioPerformanceSnapshots,
+        portfolioRiskSnapshots,
+        portfolioRiskExposures,
+        portfolioImportJobs,
+        portfolioImportRows,
+      ].map(getTableName),
+    ).toEqual([
+      'portfolios',
+      'portfolio_transactions',
+      'portfolio_positions',
+      'portfolio_cash_balances',
+      'portfolio_valuation_snapshots',
+      'portfolio_position_snapshots',
+      'portfolio_performance_snapshots',
+      'portfolio_risk_snapshots',
+      'portfolio_risk_exposures',
+      'portfolio_import_jobs',
+      'portfolio_import_rows',
     ]);
   });
 });

@@ -34,3 +34,6 @@ Repository'de bu indeks dışındaki başka bir kabul edilmiş belge `ADR-004` k
 | ADR-006 | Scan Run as Resource | Accepted |
 | ADR-007 | Immutable Scan Revisions | Accepted |
 | ADR-008 | PostgreSQL Veri Erişimi için Drizzle | Accepted |
+| ADR-009 | Moving Weighted Average Cost ve Immutable Portfolio Ledger | Accepted |
+| ADR-010 | Portfolio Performansında TWR ve XIRR Ayrımı | Accepted |
+| ADR-011 | Historical VaR ve Sürümlü Risk Metodolojisi | Accepted |

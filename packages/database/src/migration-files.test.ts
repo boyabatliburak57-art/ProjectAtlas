@@ -15,8 +15,8 @@ function migrationSql(): string {
 describe('generated PostgreSQL migrations', () => {
   const sql = migrationSql();
 
-  it('creates the thirty scoped tables and current revision view', () => {
-    expect(sql.match(/CREATE TABLE/g)).toHaveLength(30);
+  it('creates the forty-one scoped tables and current revision view', () => {
+    expect(sql.match(/CREATE TABLE/g)).toHaveLength(41);
     expect(sql).toContain('CREATE VIEW "public"."current_price_bars"');
   });
 
@@ -67,5 +67,44 @@ describe('generated PostgreSQL migrations', () => {
     expect(sql).toContain('notifications_user_read_occurred_idx');
     expect(sql).toContain('notification_outbox_status_available_idx');
     expect(sql).toContain('prevent_alert_revision_mutation');
+  });
+
+  it('contains portfolio numeric, ownership, reversal and snapshot guards', () => {
+    for (const table of [
+      'portfolios',
+      'portfolio_transactions',
+      'portfolio_positions',
+      'portfolio_cash_balances',
+      'portfolio_valuation_snapshots',
+      'portfolio_position_snapshots',
+      'portfolio_performance_snapshots',
+      'portfolio_risk_snapshots',
+      'portfolio_risk_exposures',
+      'portfolio_import_jobs',
+      'portfolio_import_rows',
+    ]) {
+      expect(sql).toContain(`CREATE TABLE "${table}"`);
+    }
+
+    expect(sql).toContain('numeric(28, 10)');
+    expect(sql).toContain('numeric(20, 12)');
+    expect(sql).toContain('"portfolios"."reporting_currency" = \'TRY\'');
+    expect(sql).not.toMatch(/\b(real|double precision)\b/i);
+    expect(sql).toContain(
+      'portfolio_transactions_portfolio_source_idempotency_unique',
+    );
+    expect(sql).toContain('portfolio_transactions_external_normalized_unique');
+    expect(sql).toContain(
+      'portfolio_transactions_corporate_action_identity_unique',
+    );
+    expect(sql).toContain('"net_contributions" numeric(28, 10)');
+    expect(sql).toContain('portfolio_transactions_reversal_same_portfolio_fk');
+    expect(sql).toContain('portfolio_positions_portfolio_instrument_unique');
+    expect(sql).toContain('portfolio_valuation_snapshots_identity_unique');
+    expect(sql).toContain('portfolio_performance_snapshots_identity_unique');
+    expect(sql).toContain('portfolio_risk_snapshots_identity_unique');
+    expect(sql).toContain('portfolio_import_jobs_portfolio_owner_fk');
+    expect(sql).toContain('portfolio_import_rows_job_owner_fk');
+    expect(sql).toContain('prevent_finalized_portfolio_transaction_mutation');
   });
 });

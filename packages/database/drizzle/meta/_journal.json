@@ -29,6 +29,20 @@
       "when": 1784138113216,
       "tag": "0003_alerts_watchlists_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784207576235,
+      "tag": "0004_portfolio_transactions_risk",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784210657747,
+      "tag": "0005_serious_corsair",
+      "breakpoints": true
     }
   ]
 }
