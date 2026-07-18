@@ -21,7 +21,7 @@ import {
   ATLAS_QUEUE_NAMES,
   type ScannerRunQueuePayload,
 } from '@atlas/types';
-import { Injectable, type OnApplicationShutdown } from '@nestjs/common';
+import { Inject, Injectable, type OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Queue, type ConnectionOptions } from 'bullmq';
@@ -43,7 +43,7 @@ export class ApiDatabase implements OnApplicationShutdown {
   readonly database: Database;
   private readonly pool: ReturnType<typeof createDatabase>['pool'];
 
-  constructor(config: ConfigService) {
+  constructor(@Inject(ConfigService) config: ConfigService) {
     const created = createDatabase(config.getOrThrow<string>('DATABASE_URL'));
     this.database = created.db;
     this.pool = created.pool;

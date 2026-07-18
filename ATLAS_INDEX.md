@@ -92,3 +92,27 @@ Görev sırası:
 3. `tasks/TASK-050C-Portfolio-Risk-Milestone-Reaudit.md`
 
 TASK-050C sonucu GO olmadan sonraki pakete geçilmez.
+
+## v0.7 Market Intelligence, Symbol Detail and Advanced Charting
+
+Belgeler:
+
+- `docs/DOC-025-Market-Overview-Requirements.md`
+- `docs/DOC-026-Symbol-Detail-and-Charting-Requirements.md`
+- `docs/DOC-027-Fundamentals-and-Ratio-Requirements.md`
+- `docs/DOC-028-Technical-Pattern-Detection-Requirements.md`
+- `docs/DOC-029-Market-Intelligence-UX.md`
+- `architecture/ARCH-010-Market-Intelligence-Read-Models.md`
+- `architecture/ARCH-011-Chart-Data-and-Overlay-Runtime.md`
+- `architecture/ARCH-012-Pattern-Detection-Runtime.md`
+- `architecture/DECISION-PROPOSAL-Market-Intelligence-Policies.md`
+- `database/DB-007-Market-Intelligence-Symbol-Fundamentals-Patterns.md`
+- `api/API-007-Market-Intelligence-Symbol-Detail.md`
+- `guides/CHART_DATA_CONTRACT.md`
+- `guides/MARKET_INTELLIGENCE_PERFORMANCE_BASELINE.md`
+- `guides/MARKET_INTELLIGENCE_TEST_MATRIX.md`
+
+Görev sırası: TASK-051 → TASK-060.
+
+TASK-052 sırasında sabit ADR numarası varsayılmaz; mevcut kayıtlar taranarak sonraki boş ve
+benzersiz kimlikler kullanılır. TASK-060 sonucu GO olmadan sonraki pakete geçilmez.

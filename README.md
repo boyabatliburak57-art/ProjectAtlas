@@ -111,3 +111,18 @@ TASK-050 sonucu NO-GO:
 Görev sırası: TASK-050A → TASK-050B → TASK-050C.
 
 TASK-050C GO olmadan sonraki pakete geçilmez.
+
+## v0.7 Market Intelligence, Symbol Detail and Advanced Charting
+
+Belgeler:
+
+- DOC-025–DOC-029
+- ARCH-010–ARCH-012
+- Market Intelligence Decision Proposal
+- DB-007
+- API-007
+- Market Intelligence Test/Performance/Chart guides
+
+Görev sırası: TASK-051 → TASK-060.
+
+TASK-060 GO olmadan sonraki pakete geçilmez.

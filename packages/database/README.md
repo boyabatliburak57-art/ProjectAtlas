@@ -5,9 +5,9 @@ Project Atlas PostgreSQL şeması, Drizzle migration'ları ve başlangıç seed'
 ## Migration stratejisi
 
 Migration'lar production yönünde forward-only uygulanır. `0002_scanner_runtime`,
-`0003_alerts_watchlists_notifications` ve `0004_portfolio_transactions_risk` için eşlenmiş rollback
-dosyaları `drizzle/rollback` altındadır. Bu dosyalar veri kaybettiren, yalnız kontrollü recovery
-için kullanılan manuel down migration'larıdır:
+`0003_alerts_watchlists_notifications`, `0004_portfolio_transactions_risk` ve
+`0007_rapid_lifeguard` için eşlenmiş rollback dosyaları `drizzle/rollback` altındadır. Bu dosyalar
+veri kaybettiren, yalnız kontrollü recovery için kullanılan manuel down migration'larıdır:
 
 1. İlgili milestone tablolarının yedeğini al.
 2. Uygulama ve worker yazımlarını durdur.

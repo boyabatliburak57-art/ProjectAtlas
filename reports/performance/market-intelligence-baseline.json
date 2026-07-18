@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-18T01:19:24.842Z",
+  "commitSha": "a5e623146268103b29f52770769c5d8cd0843c4f",
+  "status": "PASS",
+  "environment": {
+    "hostname": "192.168.1.3",
+    "platform": "darwin",
+    "release": "25.5.0",
+    "cpu": "Apple M1",
+    "memoryBytes": 8589934592,
+    "node": "v22.14.0",
+    "pnpm": "9.15.4",
+    "route": "real Nest HTTP -> controller -> application service -> PostgreSQL read model -> DTO serialization",
+    "externalProvider": false
+  },
+  "fixture": {
+    "market": "BIST",
+    "activeInstruments": 650,
+    "rankingRows": 650,
+    "generationId": "70000000-0000-4000-8000-000000000001",
+    "dataCutoffAt": "2026-07-17T15:10:00.000Z",
+    "symbolDailyBars": 730,
+    "chartOverlays": 6
+  },
+  "scenarios": [
+    {
+      "id": "PERF-MKT-001",
+      "name": "Full BIST market overview over real HTTP/read-model path",
+      "fixtureSize": "650 active BIST instruments",
+      "cacheState": "7 response-cache cold repetitions; 25 response-cache warm repetitions",
+      "repetitions": {
+        "cold": 7,
+        "warm": 25
+      },
+      "p50Ms": 1.81,
+      "p95Ms": 3.48,
+      "maxMs": 4.82,
+      "warm": {
+        "p50Ms": 1.81,
+        "p95Ms": 3.48,
+        "maxMs": 4.82
+      },
+      "cold": {
+        "p50Ms": 2.57,
+        "p95Ms": 23.89,
+        "maxMs": 23.89
+      },
+      "errorCount": 0,
+      "threshold": "warm p95 <= 500 ms; cold p95 <= 1200 ms",
+      "passed": true
+    },
+    {
+      "id": "PERF-MKT-002",
+      "name": "650-instrument ranking cursor pagination",
+      "fixtureSize": "650 ranking rows; page size 50",
+      "cacheState": "cold first page and warm subsequent traversal pages per repetition",
+      "repetitions": 7,
+      "p50Ms": 3.71,
+      "p95Ms": 7.54,
+      "maxMs": 24.39,
+      "errorCount": 0,
+      "duplicateCount": 0,
+      "missingCount": 0,
+      "threshold": "p95 <= 400 ms; duplicate = 0; missing = 0",
+      "passed": true
+    },
+    {
+      "id": "PERF-MKT-003",
+      "name": "Symbol profile, quote, signals and quality metadata",
+      "fixtureSize": "1 symbol / latest quote / latest pattern signal",
+      "cacheState": "database read path; 12 repetitions",
+      "repetitions": 12,
+      "p50Ms": 4.38,
+      "p95Ms": 23.25,
+      "maxMs": 23.25,
+      "errorCount": 0,
+      "queryCount": "7 logical read-model queries per aggregate repetition",
+      "cacheHits": 0,
+      "cacheMisses": 0,
+      "threshold": "p95 <= 700 ms",
+      "passed": true
+    },
+    {
+      "id": "PERF-MKT-004",
+      "name": "Two-year daily chart with volume, six indicators and corporate action",
+      "fixtureSize": "730 daily bars / volume + 6 indicators / 1 corporate action",
+      "cacheState": "7 cold and 20 warm response-cache repetitions",
+      "repetitions": {
+        "cold": 7,
+        "warm": 20
+      },
+      "p50Ms": 49.79,
+      "p95Ms": 67.37,
+      "maxMs": 67.37,
+      "cold": {
+        "p50Ms": 49.79,
+        "p95Ms": 67.37,
+        "maxMs": 67.37
+      },
+      "warm": {
+        "p50Ms": 11.1,
+        "p95Ms": 15.24,
+        "maxMs": 15.64
+      },
+      "errorCount": 0,
+      "queryCount": "3 logical read-model queries per HTTP request",
+      "cacheHits": 20,
+      "cacheMisses": 1,
+      "alignmentFailures": 0,
+      "threshold": "cold p95 <= 900 ms; alignment failure = 0",
+      "passed": true
+    }
+  ]
+}

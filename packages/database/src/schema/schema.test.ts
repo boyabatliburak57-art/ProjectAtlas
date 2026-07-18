@@ -12,6 +12,11 @@ import {
   ingestionRuns,
   instruments,
   instrumentSymbolHistory,
+  fundamentalMetricSnapshots,
+  fundamentalRatioSnapshots,
+  fundamentalStatementSnapshots,
+  marketOverviewSnapshots,
+  marketRankSnapshots,
   notificationDeliveries,
   notificationOutbox,
   notificationPreferences,
@@ -27,6 +32,8 @@ import {
   portfolios,
   portfolioTransactions,
   portfolioValuationSnapshots,
+  patternDefinitions,
+  patternInstances,
   priceBars,
   providerInstrumentMappings,
   presetScanRevisions,
@@ -40,6 +47,7 @@ import {
   scanRunEvents,
   scanRuns,
   sectors,
+  sectorMarketSnapshots,
   watchlistItems,
   watchlistItemTags,
   watchlists,
@@ -157,6 +165,30 @@ describe('initial database schema', () => {
       'portfolio_risk_exposures',
       'portfolio_import_jobs',
       'portfolio_import_rows',
+    ]);
+  });
+
+  it('exports the eight market intelligence read-model tables', () => {
+    expect(
+      [
+        marketOverviewSnapshots,
+        sectorMarketSnapshots,
+        marketRankSnapshots,
+        fundamentalStatementSnapshots,
+        fundamentalMetricSnapshots,
+        fundamentalRatioSnapshots,
+        patternDefinitions,
+        patternInstances,
+      ].map(getTableName),
+    ).toEqual([
+      'market_overview_snapshots',
+      'sector_market_snapshots',
+      'market_rank_snapshots',
+      'fundamental_statement_snapshots',
+      'fundamental_metric_snapshots',
+      'fundamental_ratio_snapshots',
+      'pattern_definitions',
+      'pattern_instances',
     ]);
   });
 });

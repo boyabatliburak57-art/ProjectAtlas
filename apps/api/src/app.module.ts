@@ -95,6 +95,24 @@ import {
   PORTFOLIO_IMPORT_STORE,
 } from './portfolios/portfolio-imports.ports';
 import { PortfolioImportsService } from './portfolios/portfolio-imports.service';
+import { MarketOverviewController } from './market/market-overview.controller';
+import {
+  InMemoryMarketRateLimiter,
+  MarketResponseCache,
+  PostgresMarketOverviewReader,
+} from './market/market-overview.infrastructure';
+import {
+  MARKET_OVERVIEW_READER,
+  MARKET_RATE_LIMITER,
+} from './market/market-overview.ports';
+import { MarketOverviewService } from './market/market-overview.service';
+import { SymbolDetailController } from './symbols/symbol-detail.controller';
+import {
+  PostgresSymbolDetailReader,
+  SymbolResponseCache,
+} from './symbols/symbol-detail.infrastructure';
+import { SYMBOL_DETAIL_READER } from './symbols/symbol-detail.ports';
+import { SymbolDetailService } from './symbols/symbol-detail.service';
 
 @Module({
   controllers: [
@@ -110,6 +128,8 @@ import { PortfolioImportsService } from './portfolios/portfolio-imports.service'
     NotificationPreferencesController,
     PortfoliosController,
     PortfolioImportsController,
+    MarketOverviewController,
+    SymbolDetailController,
   ],
   imports: [
     ConfigModule.forRoot({
@@ -139,6 +159,11 @@ import { PortfolioImportsService } from './portfolios/portfolio-imports.service'
     InMemoryPortfolioCommandGuard,
     PostgresPortfolioImportStore,
     PostgresPortfolioImportCommitter,
+    PostgresMarketOverviewReader,
+    InMemoryMarketRateLimiter,
+    MarketResponseCache,
+    PostgresSymbolDetailReader,
+    SymbolResponseCache,
     {
       provide: SCAN_RUN_APPLICATION,
       inject: [ApiDatabase],
@@ -189,6 +214,18 @@ import { PortfolioImportsService } from './portfolios/portfolio-imports.service'
       useExisting: PostgresPortfolioImportCommitter,
     },
     {
+      provide: MARKET_OVERVIEW_READER,
+      useExisting: PostgresMarketOverviewReader,
+    },
+    {
+      provide: MARKET_RATE_LIMITER,
+      useExisting: InMemoryMarketRateLimiter,
+    },
+    {
+      provide: SYMBOL_DETAIL_READER,
+      useExisting: PostgresSymbolDetailReader,
+    },
+    {
       provide: SCANNER_RUNTIME_READER,
       inject: [
         PostgresScannerRuntimeReader,
@@ -219,6 +256,8 @@ import { PortfolioImportsService } from './portfolios/portfolio-imports.service'
     NotificationsService,
     PortfoliosService,
     PortfolioImportsService,
+    MarketOverviewService,
+    SymbolDetailService,
   ],
 })
 export class AppModule implements NestModule {

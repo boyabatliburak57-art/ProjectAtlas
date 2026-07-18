@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.7.0-market-intelligence — 2026-07-18
+
+### Eklendi
+
+- DOC-025–DOC-029 Market Intelligence, Symbol Detail, Fundamentals, Pattern Detection ve UX gereksinimleri
+- ARCH-010–ARCH-012 read model, chart/overlay ve pattern runtime mimarileri
+- Market Intelligence policy karar önerisi
+- DB-007 Market Intelligence, Fundamentals ve Pattern persistence tasarımı
+- API-007 Market Intelligence ve Symbol Detail API sözleşmesi
+- Chart Data Contract, Market Intelligence Performance Baseline ve Test Matrix rehberleri
+- TASK-051–TASK-060 geliştirme ve milestone audit görevleri
+
+### Değişti
+
+- v0.7 Market Intelligence belge kapsamı ve TASK-051 → TASK-060 sırası README ve ATLAS_INDEX'e eklendi.
+- TASK-060 GO sonucu sonraki paket için zorunlu geçiş kapısı olarak kaydedildi.
+
+### Değişmedi
+
+- Mevcut ADR dosyaları ve kimlikleri değiştirilmedi veya yeniden numaralandırılmadı.
+- TASK-052 için sabit ADR numarası üretilmedi; sonraki boş ve benzersiz kimliklerin repository taramasıyla seçilmesi korundu.
+
 ## 0.6.1-portfolio-risk-remediation — 2026-07-16
 
 ### Eklendi

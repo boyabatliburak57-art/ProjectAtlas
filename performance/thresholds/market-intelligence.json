@@ -1,0 +1,24 @@
+{
+  "PERF-MKT-001": {
+    "warmP95Ms": 500,
+    "coldP95Ms": 1200,
+    "maximumErrors": 0,
+    "fixtureInstruments": 650
+  },
+  "PERF-MKT-002": {
+    "p95Ms": 400,
+    "maximumErrors": 0,
+    "fixtureInstruments": 650,
+    "pageSize": 50
+  },
+  "PERF-MKT-003": {
+    "p95Ms": 700,
+    "maximumErrors": 0
+  },
+  "PERF-MKT-004": {
+    "p95Ms": 900,
+    "maximumErrors": 0,
+    "dailyBars": 730,
+    "indicatorOverlays": 6
+  }
+}

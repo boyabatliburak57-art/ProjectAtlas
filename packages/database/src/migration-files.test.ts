@@ -15,8 +15,8 @@ function migrationSql(): string {
 describe('generated PostgreSQL migrations', () => {
   const sql = migrationSql();
 
-  it('creates the forty-one scoped tables and current revision view', () => {
-    expect(sql.match(/CREATE TABLE/g)).toHaveLength(41);
+  it('creates the forty-nine scoped tables and current revision view', () => {
+    expect(sql.match(/CREATE TABLE/g)).toHaveLength(49);
     expect(sql).toContain('CREATE VIEW "public"."current_price_bars"');
   });
 
@@ -110,5 +110,32 @@ describe('generated PostgreSQL migrations', () => {
     expect(sql).toContain('"preview_hash" varchar(128)');
     expect(sql).toContain('"commit_request_hash" varchar(128)');
     expect(sql).toContain('prevent_finalized_portfolio_transaction_mutation');
+  });
+
+  it('contains market intelligence generation, revision and deduplication guards', () => {
+    for (const table of [
+      'market_overview_snapshots',
+      'sector_market_snapshots',
+      'market_rank_snapshots',
+      'fundamental_statement_snapshots',
+      'fundamental_metric_snapshots',
+      'fundamental_ratio_snapshots',
+      'pattern_definitions',
+      'pattern_instances',
+    ])
+      expect(sql).toContain(`CREATE TABLE "${table}"`);
+
+    expect(sql).toContain('market_overview_snapshots_identity_unique');
+    expect(sql).toContain('market_rank_snapshots_generation_type_rank_unique');
+    expect(sql).toContain('market_rank_snapshots_type_generation_rank_idx');
+    expect(sql).toContain('fundamental_statement_snapshots_revision_unique');
+    expect(sql).toContain(
+      'fundamental_ratio_snapshots_formula_identity_unique',
+    );
+    expect(sql).toContain('pattern_instances_deduplication_key_unique');
+    expect(sql).toContain('pattern_instances_evidence_shape_check');
+    expect(sql).toContain('prevent_fundamental_statement_snapshot_mutation');
+    expect(sql).toContain('numeric(28, 10)');
+    expect(sql).toContain('numeric(20, 12)');
   });
 });

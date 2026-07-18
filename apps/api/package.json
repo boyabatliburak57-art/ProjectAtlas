@@ -9,6 +9,7 @@
     "e2e:scanner": "pnpm --filter @atlas/domain build && tsc -p tsconfig.e2e.json && node dist/e2e-server/e2e/scanner-api-server.js",
     "lint": "eslint src",
     "openapi:check": "vitest run src/openapi/openapi.test.ts",
+    "perf:market": "tsx src/performance/market-intelligence-benchmark.ts",
     "start": "node dist/main.js",
     "test": "pnpm --filter @atlas/domain build && vitest run",
     "test:database": "pnpm --filter @atlas/domain build && vitest run --config vitest.database.config.ts",

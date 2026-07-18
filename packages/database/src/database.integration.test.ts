@@ -68,6 +68,17 @@ const portfolioTables = [
   'portfolios',
 ] as const;
 
+const marketIntelligenceTables = [
+  'fundamental_metric_snapshots',
+  'fundamental_ratio_snapshots',
+  'fundamental_statement_snapshots',
+  'market_overview_snapshots',
+  'market_rank_snapshots',
+  'pattern_definitions',
+  'pattern_instances',
+  'sector_market_snapshots',
+] as const;
+
 describe('PostgreSQL migrations', () => {
   const { db, pool } = createDatabase(requireTestDatabaseUrl());
 
@@ -83,7 +94,7 @@ describe('PostgreSQL migrations', () => {
     await pool.end();
   });
 
-  it('clean-migrates exactly the forty-one domain tables', async () => {
+  it('clean-migrates exactly the forty-nine domain tables', async () => {
     const result = await pool.query<{ table_name: string }>(`
       select table_name
       from information_schema.tables
@@ -99,13 +110,20 @@ describe('PostgreSQL migrations', () => {
       'alerts',
       'data_providers',
       'data_quality_issues',
+      'fundamental_metric_snapshots',
+      'fundamental_ratio_snapshots',
+      'fundamental_statement_snapshots',
       'ingestion_runs',
       'instrument_symbol_history',
       'instruments',
+      'market_overview_snapshots',
+      'market_rank_snapshots',
       'notification_deliveries',
       'notification_outbox',
       'notification_preferences',
       'notifications',
+      'pattern_definitions',
+      'pattern_instances',
       'portfolio_cash_balances',
       'portfolio_import_jobs',
       'portfolio_import_rows',
@@ -129,6 +147,7 @@ describe('PostgreSQL migrations', () => {
       'scan_run_batches',
       'scan_run_events',
       'scan_runs',
+      'sector_market_snapshots',
       'sectors',
       'watchlist_item_tags',
       'watchlist_items',
@@ -865,6 +884,21 @@ describe('PostgreSQL migrations', () => {
   });
 
   it('executes the documented destructive rollback and reapplies forward', async () => {
+    const marketIntelligenceRollbackSql = await readFile(
+      resolve(migrationFolder(), 'rollback/0007_rapid_lifeguard.down.sql'),
+      'utf8',
+    );
+    await pool.query(marketIntelligenceRollbackSql);
+
+    const marketIntelligenceRolledBack = await pool.query<{
+      table_name: string;
+    }>(
+      `select table_name from information_schema.tables
+       where table_schema = 'public' and table_name = any($1::text[])`,
+      [marketIntelligenceTables],
+    );
+    expect(marketIntelligenceRolledBack.rows).toEqual([]);
+
     const importRollbackSql = await readFile(
       resolve(migrationFolder(), 'rollback/0006_brief_imperial_guard.down.sql'),
       'utf8',
@@ -933,7 +967,7 @@ describe('PostgreSQL migrations', () => {
       where created_at in (
         select created_at from drizzle.__drizzle_migrations
         order by created_at desc
-        limit 5
+        limit 6
       )
     `);
     await runMigrations(db);
@@ -973,5 +1007,17 @@ describe('PostgreSQL migrations', () => {
     expect(
       portfoliosReapplied.rows.map(({ table_name }) => table_name),
     ).toEqual([...portfolioTables].sort());
+
+    const marketIntelligenceReapplied = await pool.query<{
+      table_name: string;
+    }>(
+      `select table_name from information_schema.tables
+       where table_schema = 'public' and table_name = any($1::text[])
+       order by table_name`,
+      [marketIntelligenceTables],
+    );
+    expect(
+      marketIntelligenceReapplied.rows.map(({ table_name }) => table_name),
+    ).toEqual([...marketIntelligenceTables].sort());
   });
 });

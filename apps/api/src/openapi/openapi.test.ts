@@ -217,6 +217,44 @@ describe('OpenAPI document', () => {
           ?.parameters,
       ),
     ).toContain('Idempotency-Key');
+    expect(document.paths['/api/v1/market/overview']?.get).toBeDefined();
+    expect(document.paths['/api/v1/market/breadth']?.get).toBeDefined();
+    expect(document.paths['/api/v1/market/sectors']?.get).toBeDefined();
+    expect(document.paths['/api/v1/market/rankings/{type}']?.get).toBeDefined();
+    const rankingParameters =
+      document.paths['/api/v1/market/rankings/{type}']?.get?.parameters;
+    expect(JSON.stringify(rankingParameters)).toContain('cursor');
+    expect(JSON.stringify(rankingParameters)).toContain('limit');
+    expect(JSON.stringify(rankingParameters)).toContain('breakoutCandidates');
+    expect(
+      JSON.stringify(document.components?.schemas?.MarketResponseMetaDto),
+    ).toContain('generationId');
+    expect(
+      JSON.stringify(document.components?.schemas?.MarketResponseMetaDto),
+    ).toContain('dataCutoffAt');
+    expect(document.paths['/api/v1/symbols/{symbol}']?.get).toBeDefined();
+    expect(document.paths['/api/v1/symbols/{symbol}/quote']?.get).toBeDefined();
+    expect(document.paths['/api/v1/symbols/{symbol}/chart']?.get).toBeDefined();
+    expect(
+      document.paths['/api/v1/symbols/{symbol}/signals']?.get,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/symbols/{symbol}/corporate-actions']?.get,
+    ).toBeDefined();
+    const chartParameters =
+      document.paths['/api/v1/symbols/{symbol}/chart']?.get?.parameters;
+    for (const parameter of [
+      'timeframe',
+      'from',
+      'to',
+      'limit',
+      'adjustmentMode',
+      'overlays',
+      'includePatterns',
+      'includeCorporateActions',
+      'includeUserMarkers',
+    ])
+      expect(JSON.stringify(chartParameters)).toContain(parameter);
     expect(
       JSON.stringify(document.paths['/api/v1/alerts']?.get?.parameters),
     ).toContain('cursor');

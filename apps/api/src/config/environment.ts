@@ -48,6 +48,24 @@ const environmentSchema = z.object({
     .min(1_000)
     .max(3_600_000)
     .default(60_000),
+  MARKET_PUBLIC_RATE_LIMIT: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(10_000)
+    .default(300),
+  MARKET_PUBLIC_RATE_WINDOW_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .max(3_600_000)
+    .default(60_000),
+  MARKET_RESPONSE_CACHE_TTL_MS: z.coerce
+    .number()
+    .int()
+    .min(100)
+    .max(300_000)
+    .default(5_000),
 });
 
 export type Environment = z.infer<typeof environmentSchema>;
