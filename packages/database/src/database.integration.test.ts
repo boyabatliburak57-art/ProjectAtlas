@@ -79,6 +79,20 @@ const marketIntelligenceTables = [
   'sector_market_snapshots',
 ] as const;
 
+const strategyBacktestTables = [
+  'backtest_data_snapshots',
+  'backtest_fills',
+  'backtest_orders',
+  'backtest_runs',
+  'backtest_series_chunks',
+  'backtest_summaries',
+  'backtest_trades',
+  'research_experiment_runs',
+  'research_experiments',
+  'strategies',
+  'strategy_revisions',
+] as const;
+
 describe('PostgreSQL migrations', () => {
   const { db, pool } = createDatabase(requireTestDatabaseUrl());
 
@@ -94,7 +108,7 @@ describe('PostgreSQL migrations', () => {
     await pool.end();
   });
 
-  it('clean-migrates exactly the forty-nine domain tables', async () => {
+  it('clean-migrates exactly the sixty domain tables', async () => {
     const result = await pool.query<{ table_name: string }>(`
       select table_name
       from information_schema.tables
@@ -108,6 +122,13 @@ describe('PostgreSQL migrations', () => {
       'alert_states',
       'alert_triggers',
       'alerts',
+      'backtest_data_snapshots',
+      'backtest_fills',
+      'backtest_orders',
+      'backtest_runs',
+      'backtest_series_chunks',
+      'backtest_summaries',
+      'backtest_trades',
       'data_providers',
       'data_quality_issues',
       'fundamental_metric_snapshots',
@@ -139,6 +160,8 @@ describe('PostgreSQL migrations', () => {
       'preset_scans',
       'price_bars',
       'provider_instrument_mappings',
+      'research_experiment_runs',
+      'research_experiments',
       'saved_scan_revisions',
       'saved_scan_tags',
       'saved_scans',
@@ -149,6 +172,8 @@ describe('PostgreSQL migrations', () => {
       'scan_runs',
       'sector_market_snapshots',
       'sectors',
+      'strategies',
+      'strategy_revisions',
       'watchlist_item_tags',
       'watchlist_items',
       'watchlists',
@@ -884,6 +909,21 @@ describe('PostgreSQL migrations', () => {
   });
 
   it('executes the documented destructive rollback and reapplies forward', async () => {
+    const strategyBacktestRollbackSql = await readFile(
+      resolve(migrationFolder(), 'rollback/0008_stale_mandroid.down.sql'),
+      'utf8',
+    );
+    await pool.query(strategyBacktestRollbackSql);
+
+    const strategyBacktestRolledBack = await pool.query<{
+      table_name: string;
+    }>(
+      `select table_name from information_schema.tables
+       where table_schema = 'public' and table_name = any($1::text[])`,
+      [strategyBacktestTables],
+    );
+    expect(strategyBacktestRolledBack.rows).toEqual([]);
+
     const marketIntelligenceRollbackSql = await readFile(
       resolve(migrationFolder(), 'rollback/0007_rapid_lifeguard.down.sql'),
       'utf8',
@@ -967,7 +1007,7 @@ describe('PostgreSQL migrations', () => {
       where created_at in (
         select created_at from drizzle.__drizzle_migrations
         order by created_at desc
-        limit 6
+        limit 7
       )
     `);
     await runMigrations(db);
@@ -1019,5 +1059,17 @@ describe('PostgreSQL migrations', () => {
     expect(
       marketIntelligenceReapplied.rows.map(({ table_name }) => table_name),
     ).toEqual([...marketIntelligenceTables].sort());
+
+    const strategyBacktestReapplied = await pool.query<{
+      table_name: string;
+    }>(
+      `select table_name from information_schema.tables
+       where table_schema = 'public' and table_name = any($1::text[])
+       order by table_name`,
+      [strategyBacktestTables],
+    );
+    expect(
+      strategyBacktestReapplied.rows.map(({ table_name }) => table_name),
+    ).toEqual([...strategyBacktestTables].sort());
   });
 });

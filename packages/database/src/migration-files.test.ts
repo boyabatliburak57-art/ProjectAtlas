@@ -15,8 +15,8 @@ function migrationSql(): string {
 describe('generated PostgreSQL migrations', () => {
   const sql = migrationSql();
 
-  it('creates the forty-nine scoped tables and current revision view', () => {
-    expect(sql.match(/CREATE TABLE/g)).toHaveLength(49);
+  it('creates the sixty scoped tables and current revision view', () => {
+    expect(sql.match(/CREATE TABLE/g)).toHaveLength(60);
     expect(sql).toContain('CREATE VIEW "public"."current_price_bars"');
   });
 
@@ -135,6 +135,35 @@ describe('generated PostgreSQL migrations', () => {
     expect(sql).toContain('pattern_instances_deduplication_key_unique');
     expect(sql).toContain('pattern_instances_evidence_shape_check');
     expect(sql).toContain('prevent_fundamental_statement_snapshot_mutation');
+    expect(sql).toContain('numeric(28, 10)');
+    expect(sql).toContain('numeric(20, 12)');
+  });
+
+  it('contains strategy, backtest and experiment integrity guards', () => {
+    for (const table of [
+      'strategies',
+      'strategy_revisions',
+      'backtest_runs',
+      'backtest_data_snapshots',
+      'backtest_summaries',
+      'backtest_orders',
+      'backtest_fills',
+      'backtest_trades',
+      'backtest_series_chunks',
+      'research_experiments',
+      'research_experiment_runs',
+    ])
+      expect(sql).toContain(`CREATE TABLE "${table}"`);
+
+    expect(sql).toContain('strategy_revisions_strategy_revision_unique');
+    expect(sql).toContain('prevent_strategy_revision_mutation');
+    expect(sql).toContain('backtest_runs_requester_idempotency_unique');
+    expect(sql).toContain('backtest_data_snapshots_hash_unique');
+    expect(sql).toContain('backtest_fills_deduplication_key_unique');
+    expect(sql).toContain('backtest_series_chunks_run_type_chunk_unique');
+    expect(sql).toContain('research_experiment_runs_experiment_binding_unique');
+    expect(sql).toContain('backtest_runs_strategy_owner_fk');
+    expect(sql).toContain('research_experiment_runs_experiment_owner_fk');
     expect(sql).toContain('numeric(28, 10)');
     expect(sql).toContain('numeric(20, 12)');
   });

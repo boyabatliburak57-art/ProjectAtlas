@@ -4,3 +4,4 @@ export * from './market-intelligence';
 export * from './market-data';
 export * from './portfolio-transactions-risk';
 export * from './scanner-runtime';
+export * from './strategies-backtests-experiments';

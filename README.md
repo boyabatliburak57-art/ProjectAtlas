@@ -126,3 +126,21 @@ Belgeler:
 Görev sırası: TASK-051 → TASK-060.
 
 TASK-060 GO olmadan sonraki pakete geçilmez.
+
+## v0.8 Strategy Lab, Backtesting and Research Experiments
+
+Belgeler:
+
+- DOC-030–DOC-034 backtesting, strategy versioning, execution/cost/data integrity, research experiments ve UX gereksinimleri
+- ARCH-013–ARCH-015 deterministic engine, worker/results ve experiment runtime mimarileri
+- Backtesting Policies Decision Proposal
+- DB-008 Strategies, Backtests and Experiments persistence tasarımı
+- API-008 Strategies, Backtests and Experiments API sözleşmesi
+- Backtest Data Integrity, Test Matrix ve Performance Baseline rehberleri
+
+Görev sırası: TASK-061 → TASK-070.
+
+TASK-062 sırasında sabit ADR numarası kullanılmaz; repository'deki mevcut ADR kayıtları taranarak
+sonraki boş ve benzersiz kimlikler seçilir.
+
+TASK-070 Strategy Lab milestone audit sonucu GO olmadan sonraki pakete geçilmez.

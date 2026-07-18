@@ -51,6 +51,17 @@ import {
   watchlistItems,
   watchlistItemTags,
   watchlists,
+  strategies,
+  strategyRevisions,
+  backtestRuns,
+  backtestDataSnapshots,
+  backtestSummaries,
+  backtestOrders,
+  backtestFills,
+  backtestTrades,
+  backtestSeriesChunks,
+  researchExperiments,
+  researchExperimentRuns,
 } from './index';
 
 describe('initial database schema', () => {
@@ -189,6 +200,36 @@ describe('initial database schema', () => {
       'fundamental_ratio_snapshots',
       'pattern_definitions',
       'pattern_instances',
+    ]);
+  });
+
+  it('exports the eleven strategy, backtest and experiment tables', () => {
+    expect(
+      [
+        strategies,
+        strategyRevisions,
+        backtestRuns,
+        backtestDataSnapshots,
+        backtestSummaries,
+        backtestOrders,
+        backtestFills,
+        backtestTrades,
+        backtestSeriesChunks,
+        researchExperiments,
+        researchExperimentRuns,
+      ].map(getTableName),
+    ).toEqual([
+      'strategies',
+      'strategy_revisions',
+      'backtest_runs',
+      'backtest_data_snapshots',
+      'backtest_summaries',
+      'backtest_orders',
+      'backtest_fills',
+      'backtest_trades',
+      'backtest_series_chunks',
+      'research_experiments',
+      'research_experiment_runs',
     ]);
   });
 });

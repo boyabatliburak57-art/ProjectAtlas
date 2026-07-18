@@ -41,3 +41,8 @@ Repository'de bu indeks dışındaki başka bir kabul edilmiş belge `ADR-004` k
 | ADR-013 | Chart Adjustment Mode ve Data Cutoff Politikası | Accepted |
 | ADR-014 | Fundamentals Restatement Revision ve Ratio Formula Versioning | Accepted |
 | ADR-015 | Pattern Candidate Semantiği ve No-Look-Ahead Kuralı | Accepted |
+| ADR-016 | Closed-Bar Signal ve Next-Open Varsayılan Execution | Accepted |
+| ADR-017 | Point-in-Time Data ve Survivorship-Bias Politikası | Accepted |
+| ADR-018 | Deterministik Event Ordering ve Reproducibility | Accepted |
+| ADR-019 | Varsayılan Commission ve Slippage Modeli | Accepted |
+| ADR-020 | Bounded Grid Experiments ve Holdout Politikası | Accepted |

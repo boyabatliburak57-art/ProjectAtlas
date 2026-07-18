@@ -116,3 +116,30 @@ Görev sırası: TASK-051 → TASK-060.
 
 TASK-052 sırasında sabit ADR numarası varsayılmaz; mevcut kayıtlar taranarak sonraki boş ve
 benzersiz kimlikler kullanılır. TASK-060 sonucu GO olmadan sonraki pakete geçilmez.
+
+## v0.8 Strategy Lab, Backtesting and Research Experiments
+
+Belgeler:
+
+- `docs/DOC-030-Backtesting-Requirements.md`
+- `docs/DOC-031-Strategy-Definition-and-Versioning.md`
+- `docs/DOC-032-Execution-Cost-and-Data-Integrity.md`
+- `docs/DOC-033-Research-Experiments-and-Comparison.md`
+- `docs/DOC-034-Backtest-UX-Requirements.md`
+- `architecture/ARCH-013-Deterministic-Backtest-Engine.md`
+- `architecture/ARCH-014-Backtest-Worker-and-Results-Runtime.md`
+- `architecture/ARCH-015-Research-Experiment-Runtime.md`
+- `architecture/DECISION-PROPOSAL-Backtesting-Policies.md`
+- `database/DB-008-Strategies-Backtests-Experiments.md`
+- `api/API-008-Strategies-Backtests-Experiments.md`
+- `guides/BACKTEST_DATA_INTEGRITY_GUIDE.md`
+- `guides/BACKTEST_TEST_MATRIX.md`
+- `guides/BACKTEST_PERFORMANCE_BASELINE.md`
+
+Görev sırası: TASK-061 → TASK-070.
+
+TASK-062 sırasında sabit ADR numarası varsayılmaz veya mevcut ADR'ler yeniden numaralandırılmaz;
+`architecture/ADR_INDEX.md` ve bütün ADR dosyaları taranarak sonraki boş ve benzersiz kimlikler
+kullanılır.
+
+TASK-070 sonucu GO olmadan sonraki pakete geçilmez.

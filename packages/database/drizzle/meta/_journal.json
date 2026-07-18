@@ -57,6 +57,13 @@
       "when": 1784333531898,
       "tag": "0007_rapid_lifeguard",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784386615778,
+      "tag": "0008_stale_mandroid",
+      "breakpoints": true
     }
   ]
 }

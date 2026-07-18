@@ -76,7 +76,9 @@ Unique: `requested_by + idempotency_key_hash`.
 ## Events
 
 ### `backtest_orders`
+
 ### `backtest_fills`
+
 ### `backtest_trades`
 
 Fill deduplication key unique olmalıdır.
@@ -90,6 +92,7 @@ Unique: `run + series_type + chunk_index`.
 ## Experiments
 
 ### `research_experiments`
+
 ### `research_experiment_runs`
 
 Binding hash experiment içinde unique olmalıdır.

@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.8.0-strategy-lab — 2026-07-18
+
+### Eklendi
+
+- DOC-030–DOC-034 backtesting, strategy versioning, execution/cost/data integrity, research experiments ve Strategy Lab UX gereksinimleri
+- ARCH-013–ARCH-015 deterministic backtest engine, worker/results ve research experiment runtime mimarileri
+- Backtesting Policies karar önerisi
+- DB-008 Strategies, Backtests and Experiments persistence tasarımı
+- API-008 Strategies, Backtests and Experiments API sözleşmesi
+- Backtest Data Integrity Guide, Test Matrix ve Performance Baseline rehberleri
+- TASK-061–TASK-070 geliştirme, baseline ve milestone audit görevleri
+
+### Değişti
+
+- v0.8 Strategy Lab belge kapsamı ve TASK-061 → TASK-070 sırası README ve ATLAS_INDEX'e eklendi.
+- TASK-070 GO sonucu sonraki paket için zorunlu geçiş kapısı olarak kaydedildi.
+
+### Değişmedi
+
+- Mevcut ADR dosyaları ve kimlikleri değiştirilmedi veya yeniden numaralandırılmadı.
+- TASK-062 için sabit ADR numarası üretilmedi; sonraki boş ve benzersiz kimliklerin repository taramasıyla seçilmesi korundu.
+- Önceki milestone performance threshold'ları ve baseline sonuçları değiştirilmedi.
+
 ## 0.7.0-market-intelligence — 2026-07-18
 
 ### Eklendi
