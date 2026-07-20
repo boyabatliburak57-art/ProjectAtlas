@@ -249,6 +249,27 @@ describe('backtest PostgreSQL and BullMQ runtime', () => {
         .from(backtestSummaries)
         .where(eq(backtestSummaries.runId, first.run.id)),
     ).toEqual([{ value: 1 }]);
+    const [summary] = await db
+      .select({
+        annualizedReturn: backtestSummaries.annualizedReturn,
+        annualizedVolatility: backtestSummaries.volatility,
+        turnover: backtestSummaries.turnover,
+        methodology: backtestSummaries.methodology,
+      })
+      .from(backtestSummaries)
+      .where(eq(backtestSummaries.runId, first.run.id));
+    expect(summary?.annualizedReturn).not.toBeNull();
+    expect(summary?.annualizedVolatility).not.toBeNull();
+    expect(Number(summary?.turnover)).toBeGreaterThan(0);
+    expect(summary?.methodology).toMatchObject({
+      metricPolicy: { version: 'backtest-metrics-v2' },
+      metrics: {
+        turnover: {
+          status: 'complete',
+          methodologyVersion: 'backtest-metrics-v2',
+        },
+      },
+    });
   });
 
   it('2. replays the same idempotency key and request without a second run', async () => {

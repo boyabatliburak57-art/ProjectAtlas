@@ -143,3 +143,30 @@ TASK-062 sırasında sabit ADR numarası varsayılmaz veya mevcut ADR'ler yenide
 kullanılır.
 
 TASK-070 sonucu GO olmadan sonraki pakete geçilmez.
+
+## v0.8.1 Strategy Lab Remediation
+
+TASK-070 NO-GO bulguları:
+
+- PERF-BT-001–006 benchmark runner eksik
+- mandatory metrics ve turnover eksik
+- experiment production worker wiring eksik
+- full Playwright suite kararsız
+
+Belgeler:
+
+- `docs/DOC-035-Backtest-Metrics-and-Benchmark-Quality-Gates.md`
+- `guides/BACKTEST_BENCHMARK_RUNNER_SPEC.md`
+- `guides/STRATEGY_LAB_E2E_STABILITY_GUIDE.md`
+- `reports/REMEDIATION_PLAN-v0.8.1.md`
+- `reports/strategy-lab-milestone-audit.md`
+
+Görev sırası:
+
+1. `tasks/TASK-070A-Backtest-Metrics-Remediation.md`
+2. `tasks/TASK-070B-Experiment-Worker-Wiring.md`
+3. `tasks/TASK-070C-Backtest-Performance-Benchmark-Runner.md`
+4. `tasks/TASK-070D-Strategy-Lab-E2E-Stability.md`
+5. `tasks/TASK-070E-Strategy-Lab-Milestone-Reaudit.md`
+
+TASK-070E GO olmadan sonraki pakete geçilmez.

@@ -19,6 +19,7 @@
     "lint": "turbo run lint",
     "perf:scanner": "bash scripts/run-scanner-performance.sh",
     "perf:alerts": "bash scripts/run-alerts-watchlists-performance.sh",
+    "perf:backtest": "bash scripts/run-backtest-performance.sh",
     "perf:portfolio": "bash scripts/run-portfolio-performance.sh",
     "perf:market": "bash scripts/run-market-intelligence-performance.sh",
     "perf:market:regression": "bash scripts/run-market-intelligence-regression.sh",

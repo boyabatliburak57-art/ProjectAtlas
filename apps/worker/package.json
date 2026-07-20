@@ -9,6 +9,7 @@
     "lint": "eslint src",
     "perf:scanner": "tsx src/performance/scanner-runtime-benchmark.ts",
     "perf:alerts": "tsx src/performance/alerts-watchlists-benchmark.ts",
+    "perf:backtest": "tsx src/performance/backtest-benchmark.ts",
     "perf:portfolio": "tsx src/performance/portfolio-risk-benchmark.ts",
     "perf:patterns": "tsx src/performance/market-pattern-benchmark.ts",
     "start": "node dist/main.js",

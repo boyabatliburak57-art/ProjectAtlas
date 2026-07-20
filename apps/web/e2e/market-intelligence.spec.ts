@@ -19,8 +19,10 @@ test('market overview, rankings, sectors and partial freshness', async ({
   await expect(
     page.getByRole('heading', { name: 'En çok yükselenler' }),
   ).toBeVisible();
-  await page.getByRole('link', { name: 'THYAO' }).first().click();
-  await expect(page).toHaveURL(/\/symbols\/THYAO$/u);
+  await Promise.all([
+    page.waitForURL(/\/symbols\/THYAO$/u),
+    page.getByRole('link', { name: 'THYAO' }).first().click(),
+  ]);
   await expect(page.getByRole('heading', { name: 'THYAO' })).toBeVisible();
 
   await page.goto('/market/sectors');
@@ -44,16 +46,25 @@ test('chart contract, adjustment payload, six overlays, markers and accessibilit
     page.getByRole('img', { name: /THYAO 1d grafiği/u }),
   ).toBeVisible();
 
+  const finalChartResponsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      response.request().method() === 'GET' &&
+      url.pathname === '/api/v1/symbols/THYAO/chart' &&
+      url.searchParams.get('timeframe') === '1w' &&
+      url.searchParams.get('adjustmentMode') === 'split-adjusted' &&
+      url.searchParams.get('overlays')?.split(',').length === 6
+    );
+  });
   await page.getByRole('button', { name: '1w' }).click();
   await page.getByLabel('Adjustment mode').selectOption('split-adjusted');
   await page.getByLabel('Bollinger').check();
   await page.getByLabel('MACD').check();
   await page.getByLabel('ATR').check();
 
-  await expect
-    .poll(() => chartRequests.at(-1)?.searchParams.get('timeframe'))
-    .toBe('1w');
-  const finalRequest = chartRequests.at(-1)!;
+  const finalChartResponse = await finalChartResponsePromise;
+  expect(finalChartResponse.ok()).toBe(true);
+  const finalRequest = new URL(finalChartResponse.url());
   expect(finalRequest.searchParams.get('adjustmentMode')).toBe(
     'split-adjusted',
   );
@@ -104,7 +115,18 @@ test('financial revisions, pattern evidence and product integrations', async ({
     page.getByRole('heading', { name: 'Oranlar ve metodoloji' }),
   ).toBeVisible();
   await expect(page.getByText('Hesaplanamadı').first()).toBeVisible();
-  await page.getByRole('button', { name: 'Çeyreklik' }).click();
+  const quarterlyResponsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      response.request().method() === 'GET' &&
+      url.pathname === '/api/v1/symbols/THYAO/financials' &&
+      url.searchParams.get('periodType') === 'quarterly'
+    );
+  });
+  await Promise.all([
+    quarterlyResponsePromise,
+    page.getByRole('button', { name: 'Çeyreklik' }).click(),
+  ]);
   await expect(page.getByRole('rowheader', { name: /2026-Q1/u })).toBeVisible();
 
   await page.getByRole('tab', { name: 'Formasyonlar' }).click();
@@ -131,10 +153,10 @@ test('financial revisions, pattern evidence and product integrations', async ({
   ).toBeDisabled();
   expect(actions.alertPosts).toBe(1);
 
-  await page.getByRole('link', { name: 'Portföy işlemine aktar' }).click();
-  await expect(page).toHaveURL(
-    /\/portfolios\?action=transaction&symbol=THYAO/u,
-  );
+  await Promise.all([
+    page.waitForURL(/\/portfolios\?action=transaction&symbol=THYAO/u),
+    page.getByRole('link', { name: 'Portföy işlemine aktar' }).click(),
+  ]);
 });
 
 async function mockMarketApi(

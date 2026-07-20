@@ -1,4 +1,10 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import {
+  expect,
+  test,
+  type Locator,
+  type Page,
+  type Route,
+} from '@playwright/test';
 
 test.describe.configure({ mode: 'serial', timeout: 60_000 });
 
@@ -276,7 +282,10 @@ test('portfolio create, ledger, weighted average, partial sell and reversal', as
   await page.getByLabel('Not').fill('Açılış nakdi');
   await page.getByRole('button', { name: 'Taslak oluştur' }).click();
   await expect(page.getByText('Taslak').last()).toBeVisible();
-  await page.getByRole('button', { name: 'Post et' }).click();
+  await postTransaction(
+    page,
+    page.getByRole('row').filter({ hasText: 'Açılış nakdi' }),
+  );
   await expect(page.getByText('Posted').last()).toBeVisible();
 
   await createAndPostBuy(page, '10', '100', 'İlk alış');
@@ -305,7 +314,7 @@ test('portfolio create, ledger, weighted average, partial sell and reversal', as
   await page.getByLabel('Not').fill('Kısmi satış');
   await page.getByRole('button', { name: 'Taslak oluştur' }).click();
   const sellDraftRow = page.getByRole('row').filter({ hasText: 'Kısmi satış' });
-  await sellDraftRow.getByRole('button', { name: 'Post et' }).click();
+  await postTransaction(page, sellDraftRow);
   await expect(sellDraftRow.getByText('Posted')).toBeVisible();
   await page.getByRole('link', { name: 'Özet' }).click();
   await expect(page.getByRole('heading', { name: 'Pozisyonlar' })).toBeVisible({
@@ -321,7 +330,15 @@ test('portfolio create, ledger, weighted average, partial sell and reversal', as
 
   await page.getByRole('link', { name: 'İşlemler' }).click();
   const sellRow = page.getByRole('row').filter({ hasText: 'Kısmi satış' });
-  await sellRow.getByRole('button', { name: 'Ters kayıt oluştur' }).click();
+  const reversalResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname.endsWith('/reverse'),
+  );
+  await Promise.all([
+    reversalResponsePromise,
+    sellRow.getByRole('button', { name: 'Ters kayıt oluştur' }).click(),
+  ]);
   await expect(sellRow.getByText('Reversal tamamlandı')).toBeVisible();
 });
 
@@ -434,8 +451,21 @@ async function createAndPostBuy(
   await page.getByLabel('Not').fill(note);
   await page.getByRole('button', { name: 'Taslak oluştur' }).click();
   const draftRow = page.getByRole('row').filter({ hasText: note });
-  await draftRow.getByRole('button', { name: 'Post et' }).click();
+  await postTransaction(page, draftRow);
   await expect(draftRow.getByText('Posted')).toBeVisible();
+}
+
+async function postTransaction(page: Page, row: Locator) {
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname.endsWith('/post'),
+  );
+  const [response] = await Promise.all([
+    responsePromise,
+    row.getByRole('button', { name: 'Post et' }).click(),
+  ]);
+  expect(response.ok()).toBe(true);
 }
 
 function transactionDto(transaction: LedgerTransaction) {

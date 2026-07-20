@@ -1,6 +1,7 @@
 export const ATLAS_QUEUE_NAMES = {
   alerts: 'atlas.alerts.v1',
   backtests: 'atlas.backtests.v1',
+  experiments: 'atlas.experiments.v1',
   notifications: 'atlas.notifications.v1',
   deadLetter: 'atlas.system.dead-letter.v1',
   marketData: 'atlas.market-data.v1',
@@ -11,6 +12,7 @@ export const ATLAS_QUEUE_NAMES = {
 export const ATLAS_JOB_NAMES = {
   alertEvaluate: 'alerts.evaluate.v1',
   backtestRun: 'backtests.run.v1',
+  backtestExperiment: 'backtests.experiment.v1',
   notificationDeliver: 'notifications.deliver.v1',
   barIngestion: 'market-data.bar-ingestion.v1',
   deadLetter: 'system.dead-letter.v1',
@@ -65,6 +67,10 @@ export interface ScannerRunQueuePayload {
 export interface BacktestRunQueuePayload {
   readonly runId: string;
   readonly correlationId: string;
+}
+
+export interface ExperimentQueuePayload {
+  readonly experimentId: string;
 }
 
 export interface MarketDataAlertEvent {

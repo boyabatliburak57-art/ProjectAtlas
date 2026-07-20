@@ -1847,11 +1847,37 @@ function MetricBoard({
 }: {
   readonly summary?: BacktestSummary | undefined;
 }) {
-  const values = [
-    ['Toplam getiri', summary?.totalReturn],
-    ['Benchmark', summary?.benchmarkReturn],
+  const values: [string, unknown][] = [
+    [
+      'Toplam getiri',
+      summaryMetric(summary, 'totalReturn', summary?.totalReturn),
+    ],
+    [
+      'Yıllık getiri',
+      summaryMetric(summary, 'annualizedReturn', summary?.annualizedReturn),
+    ],
+    [
+      'Volatilite',
+      summaryMetric(
+        summary,
+        'annualizedVolatility',
+        summary?.annualizedVolatility,
+      ),
+    ],
+    [
+      'Benchmark',
+      summaryMetric(summary, 'benchmarkReturn', summary?.benchmarkReturn),
+    ],
+    [
+      'Fazla getiri',
+      summaryMetric(summary, 'excessReturn', summary?.excessReturn),
+    ],
     ['Maks. düşüş', summary?.maximumDrawdown],
-    ['Sharpe', summary?.sharpe],
+    ['Sharpe', summaryMetric(summary, 'sharpeRatio', summary?.sharpe)],
+    ['Sortino', summaryMetric(summary, 'sortinoRatio', summary?.sortino)],
+    ['Calmar', summaryMetric(summary, 'calmarRatio', summary?.calmar)],
+    ['Expectancy', summaryMetric(summary, 'expectancy', summary?.expectancy)],
+    ['Turnover', summaryMetric(summary, 'turnover', summary?.turnover)],
     ['İşlem', summary?.tradeCount],
     ['Kazanma oranı', summary?.winRate],
     ['Profit factor', summary?.profitFactor],
@@ -1867,6 +1893,15 @@ function MetricBoard({
       ))}
     </section>
   );
+}
+
+function summaryMetric(
+  summary: BacktestSummary | undefined,
+  name: string,
+  fallback: unknown,
+) {
+  const result = summary?.metrics?.[name];
+  return result?.status === 'complete' ? result.value : fallback;
 }
 function ResultCharts({
   data,

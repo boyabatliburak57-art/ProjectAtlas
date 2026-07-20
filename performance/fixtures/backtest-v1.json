@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "seed": "atlas-backtest-benchmark-v1",
+  "fullBist": {
+    "symbols": 650,
+    "years": 5,
+    "indicatorCount": 4,
+    "timeframe": "1d"
+  },
+  "eventEngine": {
+    "events": 5000000,
+    "costEveryEvents": 100
+  },
+  "persistence": {
+    "orders": 20000,
+    "fills": 20000,
+    "trades": 10000,
+    "seriesPoints": 50000,
+    "combinedEvents": 100000
+  },
+  "resultApi": {
+    "seriesPointsRequested": 2000,
+    "tradeDataset": 10000,
+    "tradePageSize": 100
+  },
+  "experiments": {
+    "parameterCombinations": 100
+  },
+  "reproducibility": {
+    "independentRuns": 2
+  }
+}

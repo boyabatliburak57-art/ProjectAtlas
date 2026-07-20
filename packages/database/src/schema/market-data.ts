@@ -79,6 +79,13 @@ export const priceBars = pgTable(
       table.providerId,
       table.ingestedAt.desc(),
     ),
+    index('price_bars_snapshot_resolution_idx').on(
+      table.providerId,
+      table.timeframe,
+      table.instrumentId,
+      table.openTime,
+      table.revision.desc(),
+    ),
     check('price_bars_volume_check', sql`${table.volume} >= 0`),
     check('price_bars_revision_check', sql`${table.revision} >= 1`),
     check('price_bars_time_check', sql`${table.closeTime} > ${table.openTime}`),

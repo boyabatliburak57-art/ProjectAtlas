@@ -99,6 +99,10 @@ export function createBacktestRunJobId(runId: string): string {
   return stableJobId('backtest-run', [runId]);
 }
 
+export function createExperimentJobId(experimentId: string): string {
+  return stableJobId('backtest-experiment', [experimentId]);
+}
+
 export function createAlertEvaluationJobId(
   data: AlertEvaluationQueuePayload,
 ): string {

@@ -126,12 +126,18 @@ export class BacktestRunProcessor {
                   (processed / Math.max(1, snapshot.events.length)) * 75,
                 ),
             );
-      await this.dependencies.repository.saveCheckpoint({
-        runId: run.id,
-        checkpoint,
-        progressPercent: percent,
-        occurredAt: this.now(),
-      });
+      // A completed result is persisted atomically immediately below. Writing its
+      // full processed-event set into the run JSONB first adds a large, redundant
+      // database write and cannot be used for resume. Durable checkpoints are only
+      // required while more timestamp buckets remain.
+      if (result.status !== 'completed') {
+        await this.dependencies.repository.saveCheckpoint({
+          runId: run.id,
+          checkpoint,
+          progressPercent: percent,
+          occurredAt: this.now(),
+        });
+      }
       await this.publish(
         job,
         progress(

@@ -620,6 +620,30 @@ describe('TASK-066 point-in-time and corporate-action bias fixtures', () => {
       exitReason: 'forcedExit',
     });
   });
+
+  it('includes entry/exit fees and slippage in net trade P&L and expectancy', () => {
+    const result = engine.run(
+      plan({
+        costPolicy: linearCost({ fixedFee: '1', slippageBps: '100' }),
+      }),
+      [
+        ...entryEvents(),
+        bar(3, '9'),
+        bar(4, '9', { open: '10', high: '10', low: '9' }),
+      ],
+    );
+    expect(result.trades).toHaveLength(1);
+    expect(result.trades[0]).toMatchObject({
+      grossPnl: '0',
+      totalCosts: '12',
+      realizedPnl: '-12',
+    });
+    expect(result.summary?.metrics.expectancy).toMatchObject({
+      value: '-12',
+      status: 'complete',
+      observationCount: 1,
+    });
+  });
 });
 
 function fundamentalRevisions(): readonly PointInTimeFundamentalRevision[] {

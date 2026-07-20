@@ -19,9 +19,14 @@ import { and, eq, sql } from 'drizzle-orm';
 import type {
   AlertCandidate,
   AlertEvaluationEvent,
+  AlertEvaluationPersistenceInput,
   AlertEvaluationRepository,
   PersistEvaluationResult,
 } from './contracts';
+
+type AlertEvaluationTransaction = Parameters<
+  Parameters<Database['transaction']>[0]
+>[0];
 
 export class PostgresAlertEvaluationRepository implements AlertEvaluationRepository {
   constructor(private readonly database: Database) {}
@@ -70,172 +75,188 @@ export class PostgresAlertEvaluationRepository implements AlertEvaluationReposit
     return candidates.filter((candidate) => scanSourceMatches(candidate, run));
   }
 
-  async persistEvaluation(input: {
-    readonly candidate: AlertCandidate;
-    readonly event: AlertEvaluationEvent;
-    readonly evaluation: Parameters<
-      AlertEvaluationRepository['persistEvaluation']
-    >[0]['evaluation'];
-    readonly evaluatedAt: Date;
-    readonly durationMs: number;
-  }): Promise<PersistEvaluationResult> {
+  async persistEvaluation(
+    input: AlertEvaluationPersistenceInput,
+  ): Promise<PersistEvaluationResult> {
+    return this.database.transaction((transaction) =>
+      this.persistEvaluationInTransaction(transaction, input),
+    );
+  }
+
+  async persistEvaluations(
+    inputs: readonly AlertEvaluationPersistenceInput[],
+  ): Promise<readonly PersistEvaluationResult[]> {
+    if (inputs.length === 0) return [];
     return this.database.transaction(async (transaction) => {
-      const stateKey = 'default';
-      await transaction.execute(sql`
+      const results: PersistEvaluationResult[] = [];
+      for (const input of inputs) {
+        results.push(
+          await this.persistEvaluationInTransaction(transaction, input),
+        );
+      }
+      return results;
+    });
+  }
+
+  private async persistEvaluationInTransaction(
+    transaction: AlertEvaluationTransaction,
+    input: AlertEvaluationPersistenceInput,
+  ): Promise<PersistEvaluationResult> {
+    const stateKey = 'default';
+    await transaction.execute(sql`
         select pg_advisory_xact_lock(
           hashtextextended(${`${input.candidate.alertId}:${input.candidate.alertRevision}:${stateKey}`}, 0)
         )
       `);
-      const insertedEvaluation = (
-        await transaction
-          .insert(alertEvaluations)
-          .values({
-            alertId: input.candidate.alertId,
-            alertRevision: input.candidate.alertRevision,
-            sourceEventId: input.event.eventId,
-            dataCutoffAt: new Date(input.event.dataCutoffAt),
-            instrumentId:
-              input.event.type === 'market_data_updated'
-                ? input.event.instrumentId
-                : null,
-            timeframe:
-              input.event.type === 'market_data_updated'
-                ? input.event.timeframe
-                : input.candidate.timeframe,
-            evaluationWindow: evaluationWindow(input.event),
-            status: input.evaluation.status,
-            reasonCode: input.evaluation.reasonCode,
-            result: {
-              ...input.evaluation.result,
-              matchedInstrumentIds: input.evaluation.matchedInstrumentIds,
-            },
-            durationMs: input.durationMs,
-            evaluatedAt: input.evaluatedAt,
-          })
-          .onConflictDoNothing({
-            target: [
-              alertEvaluations.alertId,
-              alertEvaluations.alertRevision,
-              alertEvaluations.sourceEventId,
-              alertEvaluations.dataCutoffAt,
-            ],
-          })
-          .returning({ id: alertEvaluations.id })
-      )[0];
-      if (insertedEvaluation === undefined) {
-        return {
-          duplicate: true,
-          triggerCount: 0,
-          triggerIds: [],
-          state: null,
-        };
-      }
-
-      const existingState = (
-        await transaction
-          .select()
-          .from(alertStates)
-          .where(
-            and(
-              eq(alertStates.alertId, input.candidate.alertId),
-              eq(alertStates.alertRevision, input.candidate.alertRevision),
-              eq(alertStates.stateKey, stateKey),
-            ),
-          )
-          .limit(1)
-      )[0];
-      const currentState =
-        existingState === undefined
-          ? createInitialAlertState({
-              alertId: input.candidate.alertId,
-              alertRevision: input.candidate.alertRevision,
-              stateKey,
-              now: input.evaluatedAt,
-            })
-          : mapState(existingState);
-      const decision = applyRepeatPolicy(
-        input.candidate.repeatPolicy,
-        currentState,
-        {
+    const insertedEvaluation = (
+      await transaction
+        .insert(alertEvaluations)
+        .values({
           alertId: input.candidate.alertId,
           alertRevision: input.candidate.alertRevision,
           sourceEventId: input.event.eventId,
           dataCutoffAt: new Date(input.event.dataCutoffAt),
-          status: input.evaluation.status,
-          evaluatedAt: input.evaluatedAt,
+          instrumentId:
+            input.event.type === 'market_data_updated'
+              ? input.event.instrumentId
+              : null,
+          timeframe:
+            input.event.type === 'market_data_updated'
+              ? input.event.timeframe
+              : input.candidate.timeframe,
           evaluationWindow: evaluationWindow(input.event),
-          matchedInstrumentIds: input.evaluation.matchedInstrumentIds,
-        },
-      );
-      await transaction
-        .insert(alertStates)
-        .values(stateValues(decision.nextState))
-        .onConflictDoUpdate({
-          target: [
-            alertStates.alertId,
-            alertStates.alertRevision,
-            alertStates.stateKey,
-          ],
-          set: {
-            matchState: decision.nextState.matchState,
-            armed: decision.nextState.armed,
-            stateData: { ...decision.nextState.stateData },
-            lastSourceEventId: decision.nextState.lastSourceEventId,
-            lastDataCutoffAt: decision.nextState.lastDataCutoffAt,
-            lastTriggeredAt: decision.nextState.lastTriggeredAt,
-            updatedAt: input.evaluatedAt,
+          status: input.evaluation.status,
+          reasonCode: input.evaluation.reasonCode,
+          result: {
+            ...input.evaluation.result,
+            matchedInstrumentIds: input.evaluation.matchedInstrumentIds,
           },
-        });
+          durationMs: input.durationMs,
+          evaluatedAt: input.evaluatedAt,
+        })
+        .onConflictDoNothing({
+          target: [
+            alertEvaluations.alertId,
+            alertEvaluations.alertRevision,
+            alertEvaluations.sourceEventId,
+            alertEvaluations.dataCutoffAt,
+          ],
+        })
+        .returning({ id: alertEvaluations.id })
+    )[0];
+    if (insertedEvaluation === undefined) {
+      return {
+        duplicate: true,
+        triggerCount: 0,
+        triggerIds: [],
+        state: null,
+      };
+    }
 
-      let triggerCount = 0;
-      const triggerIds: string[] = [];
-      if (decision.shouldTrigger) {
-        const instrumentIds =
-          decision.triggerInstrumentIds.length > 0
-            ? decision.triggerInstrumentIds
-            : [undefined];
-        for (const instrumentId of instrumentIds) {
-          const inserted = await transaction
-            .insert(alertTriggers)
-            .values({
+    const existingState = (
+      await transaction
+        .select()
+        .from(alertStates)
+        .where(
+          and(
+            eq(alertStates.alertId, input.candidate.alertId),
+            eq(alertStates.alertRevision, input.candidate.alertRevision),
+            eq(alertStates.stateKey, stateKey),
+          ),
+        )
+        .limit(1)
+    )[0];
+    const currentState =
+      existingState === undefined
+        ? createInitialAlertState({
+            alertId: input.candidate.alertId,
+            alertRevision: input.candidate.alertRevision,
+            stateKey,
+            now: input.evaluatedAt,
+          })
+        : mapState(existingState);
+    const decision = applyRepeatPolicy(
+      input.candidate.repeatPolicy,
+      currentState,
+      {
+        alertId: input.candidate.alertId,
+        alertRevision: input.candidate.alertRevision,
+        sourceEventId: input.event.eventId,
+        dataCutoffAt: new Date(input.event.dataCutoffAt),
+        status: input.evaluation.status,
+        evaluatedAt: input.evaluatedAt,
+        evaluationWindow: evaluationWindow(input.event),
+        matchedInstrumentIds: input.evaluation.matchedInstrumentIds,
+      },
+    );
+    await transaction
+      .insert(alertStates)
+      .values(stateValues(decision.nextState))
+      .onConflictDoUpdate({
+        target: [
+          alertStates.alertId,
+          alertStates.alertRevision,
+          alertStates.stateKey,
+        ],
+        set: {
+          matchState: decision.nextState.matchState,
+          armed: decision.nextState.armed,
+          stateData: { ...decision.nextState.stateData },
+          lastSourceEventId: decision.nextState.lastSourceEventId,
+          lastDataCutoffAt: decision.nextState.lastDataCutoffAt,
+          lastTriggeredAt: decision.nextState.lastTriggeredAt,
+          updatedAt: input.evaluatedAt,
+        },
+      });
+
+    let triggerCount = 0;
+    const triggerIds: string[] = [];
+    if (decision.shouldTrigger) {
+      const instrumentIds =
+        decision.triggerInstrumentIds.length > 0
+          ? decision.triggerInstrumentIds
+          : [undefined];
+      for (const instrumentId of instrumentIds) {
+        const inserted = await transaction
+          .insert(alertTriggers)
+          .values({
+            alertId: input.candidate.alertId,
+            alertRevision: input.candidate.alertRevision,
+            evaluationId: insertedEvaluation.id,
+            instrumentId: instrumentId ?? null,
+            triggerType: input.candidate.triggerPolicy,
+            deduplicationKey: createTriggerDeduplicationKey({
               alertId: input.candidate.alertId,
               alertRevision: input.candidate.alertRevision,
-              evaluationId: insertedEvaluation.id,
-              instrumentId: instrumentId ?? null,
+              sourceEventId: input.event.eventId,
+              dataCutoffAt: new Date(input.event.dataCutoffAt),
               triggerType: input.candidate.triggerPolicy,
-              deduplicationKey: createTriggerDeduplicationKey({
-                alertId: input.candidate.alertId,
-                alertRevision: input.candidate.alertRevision,
-                sourceEventId: input.event.eventId,
-                dataCutoffAt: new Date(input.event.dataCutoffAt),
-                triggerType: input.candidate.triggerPolicy,
-                instrumentId,
-                timeframe: input.candidate.timeframe,
-                evaluationWindow: evaluationWindow(input.event),
-              }),
-              payload: {
-                sourceType: input.candidate.source.type,
-                eventType: input.event.type,
-                reasonCode: input.evaluation.reasonCode,
-              },
-              occurredAt: input.evaluatedAt,
-              createdAt: input.evaluatedAt,
-            })
-            .onConflictDoNothing({
-              target: alertTriggers.deduplicationKey,
-            })
-            .returning({ id: alertTriggers.id });
-          triggerCount += inserted.length;
-          triggerIds.push(...inserted.map(({ id }) => id));
-        }
+              instrumentId,
+              timeframe: input.candidate.timeframe,
+              evaluationWindow: evaluationWindow(input.event),
+            }),
+            payload: {
+              sourceType: input.candidate.source.type,
+              eventType: input.event.type,
+              reasonCode: input.evaluation.reasonCode,
+            },
+            occurredAt: input.evaluatedAt,
+            createdAt: input.evaluatedAt,
+          })
+          .onConflictDoNothing({
+            target: alertTriggers.deduplicationKey,
+          })
+          .returning({ id: alertTriggers.id });
+        triggerCount += inserted.length;
+        triggerIds.push(...inserted.map(({ id }) => id));
       }
-      return {
-        duplicate: false,
-        triggerCount,
-        triggerIds,
-        state: decision.nextState,
-      };
-    });
+    }
+    return {
+      duplicate: false,
+      triggerCount,
+      triggerIds,
+      state: decision.nextState,
+    };
   }
 
   async listCatchUpEvents(

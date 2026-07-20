@@ -207,6 +207,7 @@ export interface ExperimentRuntimeRecord {
 }
 
 export interface ExperimentRunCompatibilityKey {
+  readonly ownerUserId: string;
   readonly strategyId: string;
   readonly strategyRevision: number;
   readonly bindingHash: string;

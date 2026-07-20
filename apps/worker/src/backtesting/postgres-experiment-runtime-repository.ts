@@ -39,6 +39,7 @@ export class PostgresExperimentRuntimeRepository implements ExperimentRuntimeRep
       .where(
         and(
           eq(backtestRuns.strategyId, key.strategyId),
+          eq(backtestRuns.requestedBy, key.ownerUserId),
           eq(backtestRuns.strategyRevision, key.strategyRevision),
           eq(backtestRuns.status, 'completed'),
           eq(backtestRuns.engineVersion, key.engineVersion),

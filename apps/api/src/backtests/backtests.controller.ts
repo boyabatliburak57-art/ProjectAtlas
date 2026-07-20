@@ -33,6 +33,7 @@ import {
 import { getRequestId } from '../common/http/request-context';
 import {
   ApiDataResponseDto,
+  BacktestSummaryResponseDto,
   BacktestCreateDto,
   ExperimentCreateDto,
   ListQueryDto,
@@ -212,10 +213,9 @@ export class BacktestsController {
       await this.service.cancel(this.user(request), id),
     );
   }
-  @Get(':id/summary') async summary(
-    @Req() request: Request,
-    @Param('id') id: string,
-  ) {
+  @Get(':id/summary')
+  @ApiOkResponse({ type: BacktestSummaryResponseDto })
+  async summary(@Req() request: Request, @Param('id') id: string) {
     return this.response(
       request,
       await this.service.summary(this.user(request), id),

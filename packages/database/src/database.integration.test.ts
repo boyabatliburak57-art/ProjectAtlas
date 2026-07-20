@@ -909,6 +909,12 @@ describe('PostgreSQL migrations', () => {
   });
 
   it('executes the documented destructive rollback and reapplies forward', async () => {
+    const snapshotIndexRollbackSql = await readFile(
+      resolve(migrationFolder(), 'rollback/0009_messy_terror.down.sql'),
+      'utf8',
+    );
+    await pool.query(snapshotIndexRollbackSql);
+
     const strategyBacktestRollbackSql = await readFile(
       resolve(migrationFolder(), 'rollback/0008_stale_mandroid.down.sql'),
       'utf8',
@@ -1007,7 +1013,7 @@ describe('PostgreSQL migrations', () => {
       where created_at in (
         select created_at from drizzle.__drizzle_migrations
         order by created_at desc
-        limit 7
+        limit 8
       )
     `);
     await runMigrations(db);

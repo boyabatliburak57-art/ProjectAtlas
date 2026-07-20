@@ -144,3 +144,16 @@ TASK-062 sırasında sabit ADR numarası kullanılmaz; repository'deki mevcut AD
 sonraki boş ve benzersiz kimlikler seçilir.
 
 TASK-070 Strategy Lab milestone audit sonucu GO olmadan sonraki pakete geçilmez.
+
+## v0.8.1 Strategy Lab Remediation
+
+TASK-070 NO-GO bulguları:
+
+- PERF-BT-001–006 benchmark runner eksik
+- mandatory metrics ve turnover eksik
+- experiment production worker wiring eksik
+- full Playwright suite kararsız
+
+Görev sırası: TASK-070A → TASK-070E.
+
+TASK-070E GO olmadan sonraki pakete geçilmez.

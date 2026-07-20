@@ -128,6 +128,7 @@ import {
 } from './backtests/backtests.controller';
 import {
   BullMqBacktestApiDispatcher,
+  BullMqExperimentApiDispatcher,
   createBacktestApplication,
   createStrategyApplication,
   InMemoryBacktestCommandGuard,
@@ -211,6 +212,7 @@ import {
     PostgresBacktestApiStore,
     PostgresExperimentStore,
     BullMqBacktestApiDispatcher,
+    BullMqExperimentApiDispatcher,
     InMemoryBacktestCommandGuard,
     {
       provide: SCAN_RUN_APPLICATION,

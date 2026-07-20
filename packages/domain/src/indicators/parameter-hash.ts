@@ -1,24 +1,40 @@
 import { IndicatorDomainError } from './errors.js';
 
-const FNV_OFFSET_BASIS = 0xcbf29ce484222325n;
-const FNV_PRIME = 0x100000001b3n;
-const UINT64_MASK = 0xffffffffffffffffn;
+const FNV_OFFSET_HIGH = 0xcbf29ce4;
+const FNV_OFFSET_LOW = 0x84222325;
+const FNV_PRIME_HIGH = 0x100;
+const FNV_PRIME_LOW = 0x1b3;
+const UINT32_SIZE = 0x1_0000_0000;
 
 export function createStableParameterHash(parameters: unknown): string {
   const canonical = canonicalize(parameters, new Set<object>());
-  let hash = FNV_OFFSET_BASIS;
+  let high = FNV_OFFSET_HIGH;
+  let low = FNV_OFFSET_LOW;
 
   for (let index = 0; index < canonical.length; index += 1) {
     const codeUnit = canonical.charCodeAt(index);
-    hash = updateHash(hash, codeUnit & 0xff);
-    hash = updateHash(hash, codeUnit >>> 8);
+    [high, low] = updateHash(high, low, codeUnit & 0xff);
+    [high, low] = updateHash(high, low, codeUnit >>> 8);
   }
 
-  return `fnv1a64:${hash.toString(16).padStart(16, '0')}`;
+  return `fnv1a64:${high.toString(16).padStart(8, '0')}${low.toString(16).padStart(8, '0')}`;
 }
 
-function updateHash(hash: bigint, octet: number): bigint {
-  return ((hash ^ BigInt(octet)) * FNV_PRIME) & UINT64_MASK;
+function updateHash(
+  high: number,
+  low: number,
+  octet: number,
+): readonly [number, number] {
+  const xoredLow = (low ^ octet) >>> 0;
+  const lowProduct = xoredLow * FNV_PRIME_LOW;
+  const nextLow = lowProduct >>> 0;
+  const carry = Math.floor(lowProduct / UINT32_SIZE);
+  const nextHigh =
+    (Math.imul(high, FNV_PRIME_LOW) +
+      Math.imul(xoredLow, FNV_PRIME_HIGH) +
+      carry) >>>
+    0;
+  return [nextHigh, nextLow];
 }
 
 function canonicalize(value: unknown, ancestors: Set<object>): string {

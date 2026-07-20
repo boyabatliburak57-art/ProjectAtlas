@@ -201,9 +201,24 @@ describe('backtest API analytics and export', () => {
       .get(`/api/v1/backtests/${runId}/summary`)
       .expect(200);
     expect(summary.body.data).toMatchObject({
-      methodology: { engineVersion: 'engine-v1' },
+      metrics: {
+        annualizedReturn: metricFixture('0.08'),
+        annualizedVolatility: metricFixture('0.12'),
+        sharpeRatio: metricFixture('0.66'),
+        sortinoRatio: metricFixture('0.91'),
+        calmarRatio: metricFixture('0.8'),
+        expectancy: metricFixture('12.5'),
+        benchmarkReturn: metricFixture('0.06'),
+        excessReturn: metricFixture('0.02'),
+        turnover: metricFixture('1.25'),
+      },
+      methodology: {
+        engineVersion: 'engine-v1',
+        metricPolicy: { version: 'backtest-metrics-v2' },
+      },
       dataSnapshot: { hash: 'snapshot-068' },
     });
+    expect(JSON.stringify(summary.body)).not.toMatch(/NaN|Infinity/u);
     expect(JSON.stringify(summary.body)).not.toContain('revisionManifest');
     await api().get(`/api/v1/backtests/${runId}/methodology`).expect(200);
     const series = await api()
@@ -358,7 +373,21 @@ class FixtureAnalytics implements BacktestAnalyticsStore {
   summary = () =>
     Promise.resolve({
       endingEquity: '1100',
-      methodology: { engineVersion: 'engine-v1' },
+      metrics: {
+        annualizedReturn: metricFixture('0.08'),
+        annualizedVolatility: metricFixture('0.12'),
+        sharpeRatio: metricFixture('0.66'),
+        sortinoRatio: metricFixture('0.91'),
+        calmarRatio: metricFixture('0.8'),
+        expectancy: metricFixture('12.5'),
+        benchmarkReturn: metricFixture('0.06'),
+        excessReturn: metricFixture('0.02'),
+        turnover: metricFixture('1.25'),
+      },
+      methodology: {
+        engineVersion: 'engine-v1',
+        metricPolicy: { version: 'backtest-metrics-v2' },
+      },
       dataSnapshot: { id: snapshotId, hash: 'snapshot-068', dataCutoffAt: now },
     });
   series = (input: Parameters<BacktestAnalyticsStore['series']>[0]) =>
@@ -630,5 +659,16 @@ function experimentBody() {
         maximumCombinations: 10,
       },
     },
+  };
+}
+
+function metricFixture(value: string) {
+  return {
+    value,
+    status: 'complete',
+    reasonCode: 'NONE',
+    observationCount: 3,
+    methodologyVersion: 'backtest-metrics-v2',
+    warnings: [],
   };
 }

@@ -1,0 +1,10 @@
+{
+  "PERF-BT-001": { "p95Ms": 30000, "minimumRepetitions": 3 },
+  "PERF-BT-002": { "p95Ms": 12000, "minimumRepetitions": 5 },
+  "PERF-BT-003": { "p95Ms": 8000, "minimumRepetitions": 5 },
+  "PERF-BT-004-summary": { "p95Ms": 500, "minimumRepetitions": 10 },
+  "PERF-BT-004-series": { "p95Ms": 700, "minimumRepetitions": 10 },
+  "PERF-BT-004-trades": { "p95Ms": 500, "minimumRepetitions": 10 },
+  "PERF-BT-005": { "p95Ms": 3000, "minimumRepetitions": 5 },
+  "PERF-BT-006": { "p95Ms": 30000, "minimumRepetitions": 2 }
+}

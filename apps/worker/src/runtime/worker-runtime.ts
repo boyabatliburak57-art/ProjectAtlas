@@ -4,6 +4,7 @@ import { Job, Queue, UnrecoverableError, Worker } from 'bullmq';
 import type {
   AlertEvaluationQueuePayload,
   BacktestRunQueuePayload,
+  ExperimentQueuePayload,
   NotificationDeliveryQueuePayload,
 } from '@atlas/types';
 
@@ -11,6 +12,10 @@ import {
   createDefaultBacktestComposition,
   type BacktestComposition,
 } from '../backtesting/backtest-composition';
+import {
+  createDefaultExperimentComposition,
+  type ExperimentComposition,
+} from '../backtesting/experiment-composition';
 
 import {
   createDefaultAlertComposition,
@@ -65,6 +70,7 @@ export class WorkerRuntime {
     private readonly alertQueue: Queue<AlertEvaluationQueuePayload>,
     private readonly notificationQueue: Queue<NotificationDeliveryQueuePayload>,
     private readonly backtestQueue: Queue<BacktestRunQueuePayload>,
+    private readonly experimentQueue: Queue<ExperimentQueuePayload>,
     private readonly deadLetterQueue: Queue<DeadLetterData>,
     private readonly systemWorker: Worker,
     private readonly marketDataWorker: Worker,
@@ -72,11 +78,13 @@ export class WorkerRuntime {
     private readonly alertWorker: Worker<AlertEvaluationQueuePayload>,
     private readonly notificationWorker: Worker<NotificationDeliveryQueuePayload>,
     private readonly backtestWorker: Worker<BacktestRunQueuePayload>,
+    private readonly experimentWorker: Worker<ExperimentQueuePayload>,
     private readonly marketDataComposition: MarketDataComposition,
     private readonly scannerComposition: ScannerComposition,
     private readonly alertComposition: AlertComposition,
     private readonly notificationComposition: NotificationComposition,
     private readonly backtestComposition: BacktestComposition,
+    private readonly experimentComposition: ExperimentComposition,
     private readonly workerId: string,
   ) {}
 
@@ -88,6 +96,7 @@ export class WorkerRuntime {
     injectedAlertComposition?: AlertComposition,
     injectedNotificationComposition?: NotificationComposition,
     injectedBacktestComposition?: BacktestComposition,
+    injectedExperimentComposition?: ExperimentComposition,
   ): Promise<WorkerRuntime> {
     const connection = createRedisConnection(environment.REDIS_URL);
     const systemQueue = new Queue(QUEUE_NAMES.system, {
@@ -122,6 +131,10 @@ export class WorkerRuntime {
     );
     const backtestQueue = new Queue<BacktestRunQueuePayload>(
       QUEUE_NAMES.backtests,
+      { connection, defaultJobOptions: DEFAULT_JOB_OPTIONS },
+    );
+    const experimentQueue = new Queue<ExperimentQueuePayload>(
+      QUEUE_NAMES.experiments,
       { connection, defaultJobOptions: DEFAULT_JOB_OPTIONS },
     );
     const systemWorker = new Worker(
@@ -199,7 +212,23 @@ export class WorkerRuntime {
     const backtestWorker = new Worker<BacktestRunQueuePayload>(
       QUEUE_NAMES.backtests,
       (job) => backtestComposition.process(job),
-      { concurrency: environment.WORKER_CONCURRENCY, connection },
+      {
+        concurrency: environment.WORKER_CONCURRENCY,
+        connection,
+        lockDuration: environment.BACKTEST_RUN_TIMEOUT_MS,
+      },
+    );
+    const experimentComposition =
+      injectedExperimentComposition ??
+      createDefaultExperimentComposition(environment, logger, backtestQueue);
+    const experimentWorker = new Worker<ExperimentQueuePayload>(
+      QUEUE_NAMES.experiments,
+      (job) => experimentComposition.process(job),
+      {
+        concurrency: environment.WORKER_CONCURRENCY,
+        connection,
+        lockDuration: environment.BACKTEST_RUN_TIMEOUT_MS,
+      },
     );
     const runtime = new WorkerRuntime(
       environment,
@@ -210,6 +239,7 @@ export class WorkerRuntime {
       alertQueue,
       notificationQueue,
       backtestQueue,
+      experimentQueue,
       deadLetterQueue,
       systemWorker,
       marketDataWorker,
@@ -217,11 +247,13 @@ export class WorkerRuntime {
       alertWorker,
       notificationWorker,
       backtestWorker,
+      experimentWorker,
       marketDataComposition,
       scannerComposition,
       alertComposition,
       notificationComposition,
       backtestComposition,
+      experimentComposition,
       randomUUID(),
     );
 
@@ -231,6 +263,7 @@ export class WorkerRuntime {
       await runtime.waitUntilReady();
       await notificationComposition.catchUp();
       await alertComposition.catchUp(alertQueue);
+      await experimentComposition.reconcile(experimentQueue);
       await runtime.enqueueHeartbeat();
       runtime.startHeartbeat();
       logger.info('worker.ready', {
@@ -242,6 +275,7 @@ export class WorkerRuntime {
           QUEUE_NAMES.alerts,
           QUEUE_NAMES.notifications,
           QUEUE_NAMES.backtests,
+          QUEUE_NAMES.experiments,
         ],
       });
       return runtime;
@@ -271,6 +305,7 @@ export class WorkerRuntime {
       this.alertWorker.pause(false),
       this.notificationWorker.pause(false),
       this.backtestWorker.pause(false),
+      this.experimentWorker.pause(false),
     ]);
     await this.closeConnections();
     this.logger.info('worker.stopped', { reason });
@@ -294,6 +329,7 @@ export class WorkerRuntime {
           this.alertQueue.waitUntilReady(),
           this.notificationQueue.waitUntilReady(),
           this.backtestQueue.waitUntilReady(),
+          this.experimentQueue.waitUntilReady(),
           this.deadLetterQueue.waitUntilReady(),
           this.systemWorker.waitUntilReady(),
           this.marketDataWorker.waitUntilReady(),
@@ -301,6 +337,7 @@ export class WorkerRuntime {
           this.alertWorker.waitUntilReady(),
           this.notificationWorker.waitUntilReady(),
           this.backtestWorker.waitUntilReady(),
+          this.experimentWorker.waitUntilReady(),
         ]),
         timeoutPromise,
       ]);
@@ -319,6 +356,14 @@ export class WorkerRuntime {
             error instanceof Error ? error.constructor.name : 'UnknownError',
         });
       });
+      void this.experimentComposition
+        .reconcile(this.experimentQueue)
+        .catch((error: unknown) => {
+          this.logger.error('worker.experiment.reconcile-failed', {
+            errorType:
+              error instanceof Error ? error.constructor.name : 'UnknownError',
+          });
+        });
     }, this.environment.WORKER_HEARTBEAT_INTERVAL_MS);
   }
 
@@ -342,6 +387,7 @@ export class WorkerRuntime {
     this.registerQueueError(this.alertQueue, QUEUE_NAMES.alerts);
     this.registerQueueError(this.notificationQueue, QUEUE_NAMES.notifications);
     this.registerQueueError(this.backtestQueue, QUEUE_NAMES.backtests);
+    this.registerQueueError(this.experimentQueue, QUEUE_NAMES.experiments);
     this.registerQueueError(this.deadLetterQueue, QUEUE_NAMES.deadLetter);
     this.registerJobEvents(this.systemWorker, QUEUE_NAMES.system);
     this.registerJobEvents(this.marketDataWorker, QUEUE_NAMES.marketData);
@@ -349,6 +395,7 @@ export class WorkerRuntime {
     this.registerJobEvents(this.alertWorker, QUEUE_NAMES.alerts);
     this.registerJobEvents(this.notificationWorker, QUEUE_NAMES.notifications);
     this.registerJobEvents(this.backtestWorker, QUEUE_NAMES.backtests);
+    this.registerJobEvents(this.experimentWorker, QUEUE_NAMES.experiments);
   }
 
   private registerQueueError(queue: Queue, queueName: string): void {
@@ -436,18 +483,21 @@ export class WorkerRuntime {
       this.alertWorker.close(),
       this.notificationWorker.close(),
       this.backtestWorker.close(),
+      this.experimentWorker.close(),
       this.systemQueue.close(),
       this.marketDataQueue.close(),
       this.scannerQueue.close(),
       this.alertQueue.close(),
       this.notificationQueue.close(),
       this.backtestQueue.close(),
+      this.experimentQueue.close(),
       this.deadLetterQueue.close(),
       this.marketDataComposition.close(),
       this.scannerComposition.close(),
       this.alertComposition.close(),
       this.notificationComposition.close(),
       this.backtestComposition.close(),
+      this.experimentComposition.close(),
     ]);
   }
 }

@@ -6,10 +6,15 @@ import type {
   PreparedOperandValues,
 } from './contracts.js';
 
+const operandKeyCache = new WeakMap<object, string>();
+
 export function createScanOperandKey(operand: ScanOperand): string {
+  const cached = operandKeyCache.get(operand);
+  if (cached !== undefined) return cached;
+  let key: string;
   switch (operand.type) {
     case 'indicator':
-      return [
+      key = [
         'indicator',
         operand.code,
         operand.version,
@@ -17,17 +22,25 @@ export function createScanOperandKey(operand: ScanOperand): string {
         operand.timeframe,
         createStableParameterHash(operand.parameters),
       ].join(':');
+      break;
     case 'priceField':
-      return `priceField:${operand.field}:${operand.timeframe}`;
+      key = `priceField:${operand.field}:${operand.timeframe}`;
+      break;
     case 'volumeField':
-      return `volumeField:${operand.field}:${operand.timeframe}`;
+      key = `volumeField:${operand.field}:${operand.timeframe}`;
+      break;
     case 'marketField':
-      return `marketField:${operand.field}`;
+      key = `marketField:${operand.field}`;
+      break;
     case 'constantNumber':
-      return `constantNumber:${Object.is(operand.value, -0) ? 0 : operand.value}`;
+      key = `constantNumber:${Object.is(operand.value, -0) ? 0 : operand.value}`;
+      break;
     case 'constantBoolean':
-      return `constantBoolean:${operand.value}`;
+      key = `constantBoolean:${operand.value}`;
+      break;
   }
+  operandKeyCache.set(operand, key);
+  return key;
 }
 
 export function createPreparedOperandValues(

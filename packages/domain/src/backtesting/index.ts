@@ -3,6 +3,7 @@ export * from './data-integrity.js';
 export * from './engine.js';
 export * from './experiment-runtime.js';
 export * from './execution-cost.js';
+export * from './metrics.js';
 export * from './backtest-run-application-service.js';
 export * from './runtime-contracts.js';
 export * from './runtime-errors.js';

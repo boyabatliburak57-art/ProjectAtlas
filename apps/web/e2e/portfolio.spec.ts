@@ -3,9 +3,9 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 const instrumentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const savedScanId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const watchlistId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
-let alertSequence = 0;
 
 interface MockState {
+  alertSequence: number;
   watchlists: Array<Record<string, unknown>>;
   alerts: Array<Record<string, unknown>>;
   notifications: Array<Record<string, unknown>>;
@@ -14,6 +14,7 @@ interface MockState {
 
 function state(): MockState {
   return {
+    alertSequence: 0,
     watchlists: [],
     alerts: [],
     notifications: [],
@@ -112,9 +113,9 @@ async function mockPortfolio(page: Page, fixture: MockState) {
       return json(route, fixture.alerts);
     if (path === '/alerts' && method === 'POST') {
       const input = request.postDataJSON() as Record<string, unknown>;
-      alertSequence += 1;
+      fixture.alertSequence += 1;
       const alert = {
-        id: `eeeeeeee-eeee-4eee-8eee-${String(alertSequence).padStart(12, '0')}`,
+        id: `eeeeeeee-eeee-4eee-8eee-${String(fixture.alertSequence).padStart(12, '0')}`,
         name: input.name,
         status: 'active',
         currentRevision: 1,
@@ -227,7 +228,10 @@ test('watchlist, alert trigger, notification ve lifecycle akışı', async ({
   ).toBeVisible();
   await expect(page.getByText('Güncel')).toBeVisible();
 
-  await page.getByRole('link', { name: 'Alarmlar' }).click();
+  await Promise.all([
+    page.waitForURL(/\/alerts$/u),
+    page.getByRole('link', { name: 'Alarmlar' }).click(),
+  ]);
   await page.getByRole('button', { name: 'Fiyat alarmı' }).click();
   await page.getByLabel('Alarm adı').fill('THYAO 310 üstü');
   await page.getByLabel('Enstrüman kimliği').fill(instrumentId);
@@ -242,35 +246,67 @@ test('watchlist, alert trigger, notification ve lifecycle akışı', async ({
       body: '{}',
     });
   });
-  await page.getByRole('link', { name: /Bildirimler/ }).click();
+  await Promise.all([
+    page.waitForURL(/\/notifications$/u),
+    page.getByRole('link', { name: /Bildirimler/ }).click(),
+  ]);
   await expect(
     page.getByRole('heading', { name: 'THYAO 310 üstü' }),
   ).toBeVisible();
   await expect(page.getByText('Alarm tetiklendi')).toBeVisible();
   await expect(page.getByLabel('1 okunmamış bildirim')).toBeVisible();
-  await page
-    .getByRole('button', { name: 'THYAO 310 üstü bildirimini okundu yap' })
-    .click();
+  const readResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname.endsWith('/read'),
+  );
+  await Promise.all([
+    readResponsePromise,
+    page
+      .getByRole('button', { name: 'THYAO 310 üstü bildirimini okundu yap' })
+      .click(),
+  ]);
   await expect(
     page.getByRole('button', {
       name: 'THYAO 310 üstü bildirimini okunmadı yap',
     }),
   ).toBeVisible();
 
-  await page.getByRole('link', { name: 'Alarmlar' }).click();
+  await Promise.all([
+    page.waitForURL(/\/alerts$/u),
+    page.getByRole('link', { name: 'Alarmlar' }).click(),
+  ]);
   await page.getByRole('button', { name: 'NewMatch alarmı' }).click();
   await page.getByLabel('Alarm adı').fill('Yeni RSI eşleşmeleri');
   await page.getByLabel('Saved scan kimliği').fill(savedScanId);
   await page.getByLabel('Saved scan revision').fill('1');
   await page.getByRole('button', { name: 'Alarm oluştur' }).click();
   await expect(page.getByText('Saved scan · yeni eşleşme')).toBeVisible();
-  await page
-    .getByRole('button', { name: 'Yeni RSI eşleşmeleri alarmını duraklat' })
-    .click();
+  const pauseResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname.endsWith('/pause'),
+  );
+  await Promise.all([
+    pauseResponsePromise,
+    page
+      .getByRole('button', { name: 'Yeni RSI eşleşmeleri alarmını duraklat' })
+      .click(),
+  ]);
   await expect(page.getByText('Duraklatıldı')).toBeVisible();
-  await page
-    .getByRole('button', { name: 'Yeni RSI eşleşmeleri alarmını devam ettir' })
-    .click();
+  const resumeResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname.endsWith('/resume'),
+  );
+  await Promise.all([
+    resumeResponsePromise,
+    page
+      .getByRole('button', {
+        name: 'Yeni RSI eşleşmeleri alarmını devam ettir',
+      })
+      .click(),
+  ]);
   await expect(page.getByText('Aktif').first()).toBeVisible();
 });
 

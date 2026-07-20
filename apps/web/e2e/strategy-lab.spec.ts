@@ -1,15 +1,29 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { createHash } from 'node:crypto';
 
-test.describe.configure({ mode: 'serial', timeout: 60_000 });
+import {
+  expect,
+  test,
+  type Page,
+  type Route,
+  type TestInfo,
+} from '@playwright/test';
 
-const strategyId = '81000000-0000-4000-8000-000000000069';
-const clonedStrategyId = '82000000-0000-4000-8000-000000000069';
-const runId = '83000000-0000-4000-8000-000000000069';
-const cancelRunId = '84000000-0000-4000-8000-000000000069';
-const experimentId = '85000000-0000-4000-8000-000000000069';
-const foreignId = '86000000-0000-4000-8000-000000000069';
+test.describe.configure({ timeout: 60_000 });
+
+interface LabIds {
+  readonly namespace: string;
+  readonly ownerUserId: string;
+  readonly strategyId: string;
+  readonly clonedStrategyId: string;
+  readonly runId: string;
+  readonly cancelRunId: string;
+  readonly experimentId: string;
+  readonly foreignId: string;
+  readonly snapshotHash: string;
+}
 
 interface LabState {
+  ids: LabIds;
   strategy: ReturnType<typeof strategy>;
   validationRequests: Record<string, unknown>[];
   backtestRequests: Record<string, unknown>[];
@@ -17,24 +31,29 @@ interface LabState {
   terminalPolls: number;
   tradePages: number;
   experimentRequests: Record<string, unknown>[];
+  idempotencyKeys: Set<string>;
 }
 
-function state(): LabState {
+function state(testInfo: TestInfo): LabState {
+  const ids = resourceIds(testInfo);
   return {
-    strategy: strategy(),
+    ids,
+    strategy: strategy(ids),
     validationRequests: [],
     backtestRequests: [],
     runPolls: 0,
     terminalPolls: 0,
     tradePages: 0,
     experimentRequests: [],
+    idempotencyKeys: new Set(),
   };
 }
 
 test('strategy create, AST validation round-trip, revision, clone and keyboard', async ({
   page,
-}) => {
-  const fixture = state();
+}, testInfo) => {
+  const fixture = state(testInfo);
+  const { clonedStrategyId, strategyId } = fixture.ids;
   await mockLabApi(page, fixture);
   await page.goto('/strategies/new');
 
@@ -112,8 +131,9 @@ test('strategy create, AST validation round-trip, revision, clone and keyboard',
 
 test('backtest payload round-trip, terminal polling, results, cursor and methodology', async ({
   page,
-}) => {
-  const fixture = state();
+}, testInfo) => {
+  const fixture = state(testInfo);
+  const { runId, snapshotHash, strategyId } = fixture.ids;
   await mockLabApi(page, fixture);
   await page.goto(`/backtests?strategyId=${strategyId}`);
   await page.getByLabel('Backtest başlangıç').fill('2021-01-01');
@@ -121,7 +141,18 @@ test('backtest payload round-trip, terminal polling, results, cursor and methodo
   await page.getByLabel('Başlangıç sermayesi').fill('250000');
   await page.getByLabel('Adjustment mode').selectOption('splitAdjusted');
   await page.getByLabel('Parametre override').fill('32');
+  const terminalResponsePromise = page.waitForResponse(async (response) => {
+    if (
+      response.request().method() !== 'GET' ||
+      new URL(response.url()).pathname !== `/api/v1/backtests/${runId}`
+    )
+      return false;
+    const body = (await response.json()) as { data?: { status?: string } };
+    return body.data?.status === 'completed';
+  });
   await page.getByRole('button', { name: 'Backtest çalıştır' }).click();
+  const terminalResponse = await terminalResponsePromise;
+  expect(terminalResponse.ok()).toBe(true);
 
   const payload = fixture.backtestRequests[0]!;
   expect(payload).toMatchObject({
@@ -151,14 +182,23 @@ test('backtest payload round-trip, terminal polling, results, cursor and methodo
   await expect(
     page.getByRole('heading', { name: 'Metodoloji ve veri snapshot’ı' }),
   ).toBeVisible();
-  await expect(
-    page.getByText('snapshot-pit-069', { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText(snapshotHash, { exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Daha fazla işlem' }).click();
-  expect(fixture.tradePages).toBe(2);
+  const secondTradePagePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      response.request().method() === 'GET' &&
+      url.pathname === `/api/v1/backtests/${runId}/trades` &&
+      url.searchParams.get('cursor') === 'trade-page-2'
+    );
+  });
+  await Promise.all([
+    secondTradePagePromise,
+    page.getByRole('button', { name: 'Daha fazla işlem' }).click(),
+  ]);
   const rows = page.locator('.result-section tbody tr');
   await expect(rows).toHaveCount(4);
+  expect(fixture.tradePages).toBe(2);
   const ids = await rows.locator('button').allTextContents();
   expect(ids).toHaveLength(4);
   await rows.first().getByRole('button', { name: 'Detay' }).click();
@@ -166,26 +206,50 @@ test('backtest payload round-trip, terminal polling, results, cursor and methodo
     page.getByRole('complementary', { name: 'İşlem detayı' }),
   ).toBeVisible();
 
-  await page.waitForTimeout(2200);
   expect(fixture.runPolls).toBe(fixture.terminalPolls);
+  expect(fixture.idempotencyKeys.size).toBe(1);
 });
 
 test('cancellation, grid experiment and in/out-of-sample comparison', async ({
   page,
-}) => {
-  const fixture = state();
+}, testInfo) => {
+  const fixture = state(testInfo);
+  const { cancelRunId, experimentId, strategyId } = fixture.ids;
   await mockLabApi(page, fixture);
   await page.goto(`/backtests/${cancelRunId}`);
   await expect(
     page.getByRole('button', { name: 'Çalışmayı iptal et' }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Çalışmayı iptal et' }).click();
+  const cancellationResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname ===
+        `/api/v1/backtests/${cancelRunId}/cancel`,
+  );
+  const [cancellationResponse] = await Promise.all([
+    cancellationResponsePromise,
+    page.getByRole('button', { name: 'Çalışmayı iptal et' }).click(),
+  ]);
+  expect(cancellationResponse.ok()).toBe(true);
+  const cancellationBody = (await cancellationResponse.json()) as {
+    data?: { status?: string };
+  };
+  expect(cancellationBody.data?.status).toBe('cancelled');
   await expect(page.getByText(/Run cancelled/u)).toBeVisible();
 
   await page.goto('/experiments');
   await page.getByLabel('Grid değerleri').fill('25, 35, 45');
   await expect(page.getByText('6').first()).toBeVisible();
-  await page.getByRole('button', { name: 'Deneyi başlat' }).click();
+  const experimentResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === '/api/v1/experiments',
+  );
+  const [experimentResponse] = await Promise.all([
+    experimentResponsePromise,
+    page.getByRole('button', { name: 'Deneyi başlat' }).click(),
+  ]);
+  expect(experimentResponse.ok()).toBe(true);
   expect(fixture.experimentRequests[0]).toMatchObject({
     strategyId,
     definition: {
@@ -212,8 +276,10 @@ test('cancellation, grid experiment and in/out-of-sample comparison', async ({
 
 test('strategy, run and experiment IDOR are rendered safely', async ({
   page,
-}) => {
-  await mockLabApi(page, state());
+}, testInfo) => {
+  const fixture = state(testInfo);
+  const { foreignId } = fixture.ids;
+  await mockLabApi(page, fixture);
   for (const path of [
     `/strategies/${foreignId}`,
     `/backtests/${foreignId}`,
@@ -228,6 +294,14 @@ test('strategy, run and experiment IDOR are rendered safely', async ({
 });
 
 async function mockLabApi(page: Page, fixture: LabState) {
+  const {
+    cancelRunId,
+    clonedStrategyId,
+    experimentId,
+    foreignId,
+    runId,
+    strategyId,
+  } = fixture.ids;
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -258,7 +332,12 @@ async function mockLabApi(page: Page, fixture: LabState) {
         description: string;
         definition: Record<string, unknown>;
       };
-      fixture.strategy = strategy(strategyId, input.name, input.definition);
+      fixture.strategy = strategy(
+        fixture.ids,
+        strategyId,
+        input.name,
+        input.definition,
+      );
       return envelope(route, fixture.strategy, 201);
     }
     if (path === `/strategies/${strategyId}` && method === 'GET')
@@ -285,41 +364,53 @@ async function mockLabApi(page: Page, fixture: LabState) {
     if (path === `/strategies/${strategyId}/clone` && method === 'POST')
       return envelope(
         route,
-        strategy(clonedStrategyId, `${fixture.strategy.name} (Kopya)`),
+        strategy(
+          fixture.ids,
+          clonedStrategyId,
+          `${fixture.strategy.name} (Kopya)`,
+        ),
         201,
       );
     if (path === `/strategies/${clonedStrategyId}`)
       return envelope(
         route,
-        strategy(clonedStrategyId, `${fixture.strategy.name} (Kopya)`),
+        strategy(
+          fixture.ids,
+          clonedStrategyId,
+          `${fixture.strategy.name} (Kopya)`,
+        ),
       );
 
     if (path === '/backtests' && method === 'GET')
       return envelope(route, { items: [] });
     if (path === '/backtests' && method === 'POST') {
+      const idempotencyKey = request.headers()['idempotency-key'];
+      expect(idempotencyKey).toBeTruthy();
+      expect(fixture.idempotencyKeys.has(idempotencyKey!)).toBe(false);
+      fixture.idempotencyKeys.add(idempotencyKey!);
       fixture.backtestRequests.push(
         request.postDataJSON() as Record<string, unknown>,
       );
-      return envelope(route, run(runId, 'queued', 2), 201);
+      return envelope(route, run(fixture.ids, runId, 'queued', 2), 201);
     }
     if (path === `/backtests/${cancelRunId}` && method === 'GET')
-      return envelope(route, run(cancelRunId, 'running', 44));
+      return envelope(route, run(fixture.ids, cancelRunId, 'running', 44));
     if (path === `/backtests/${cancelRunId}/cancel` && method === 'POST')
-      return envelope(route, run(cancelRunId, 'cancelled', 44));
+      return envelope(route, run(fixture.ids, cancelRunId, 'cancelled', 44));
     if (path === `/backtests/${runId}` && method === 'GET') {
       fixture.runPolls += 1;
       const result =
         fixture.runPolls < 2
-          ? run(runId, 'running', 65)
-          : run(runId, 'completed', 100);
+          ? run(fixture.ids, runId, 'running', 65)
+          : run(fixture.ids, runId, 'completed', 100);
       if (result.status === 'completed')
         fixture.terminalPolls = fixture.runPolls;
       return envelope(route, result);
     }
     if (path === `/backtests/${runId}/summary`)
-      return envelope(route, summary());
+      return envelope(route, summary(fixture.ids));
     if (path === `/backtests/${runId}/methodology`)
-      return envelope(route, methodology());
+      return envelope(route, methodology(fixture.ids));
     if (path === `/backtests/${runId}/orders`)
       return envelope(route, { items: [{ id: 'order-1', status: 'filled' }] });
     if (path === `/backtests/${runId}/fills`)
@@ -344,10 +435,10 @@ async function mockLabApi(page: Page, fixture: LabState) {
       fixture.experimentRequests.push(
         request.postDataJSON() as Record<string, unknown>,
       );
-      return envelope(route, experiment(), 201);
+      return envelope(route, experiment(fixture.ids), 201);
     }
     if (path === `/experiments/${experimentId}`)
-      return envelope(route, experiment());
+      return envelope(route, experiment(fixture.ids));
     if (path === `/experiments/${experimentId}/results`)
       return envelope(route, {
         items: matrix().map((item, index) => ({
@@ -391,14 +482,43 @@ async function apiError(route: Route, code: string, status: number) {
     body: JSON.stringify({ error: { code, message: code } }),
   });
 }
+
+function resourceIds(testInfo: TestInfo): LabIds {
+  const namespace = createHash('sha256')
+    .update(
+      `${testInfo.testId}:${testInfo.project.name}:${testInfo.repeatEachIndex}:${testInfo.workerIndex}`,
+    )
+    .digest('hex')
+    .slice(0, 12);
+  const id = (role: string) => {
+    const hex = createHash('sha256')
+      .update(`${namespace}:${role}`)
+      .digest('hex')
+      .slice(0, 32);
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20)}`;
+  };
+  return {
+    namespace,
+    ownerUserId: id('owner'),
+    strategyId: id('strategy'),
+    clonedStrategyId: id('clone'),
+    runId: id('run'),
+    cancelRunId: id('cancel-run'),
+    experimentId: id('experiment'),
+    foreignId: id('foreign'),
+    snapshotHash: `snapshot-pit-${namespace}`,
+  };
+}
+
 function strategy(
-  id = strategyId,
+  ids: LabIds,
+  id = ids.strategyId,
   name = 'RSI dönüş stratejisi',
   definition: Record<string, unknown> = definitionFixture(),
 ) {
   return {
     id,
-    ownerUserId: 'owner',
+    ownerUserId: ids.ownerUserId,
     name,
     description: 'Point-in-time BIST araştırması',
     status: 'validated' as const,
@@ -488,23 +608,24 @@ function definitionFixture() {
   };
 }
 function run(
+  ids: LabIds,
   id: string,
   status: 'queued' | 'running' | 'completed' | 'cancelled',
   progressPercent: number,
 ) {
   return {
     id,
-    strategyId,
+    strategyId: ids.strategyId,
     strategyRevision: 1,
     status,
     progressPercent,
     queuedAt: '2026-07-18T12:00:00.000Z',
     completedAt: status === 'completed' ? '2026-07-18T12:03:00.000Z' : null,
     errorCode: null,
-    dataSnapshotHash: 'snapshot-pit-069',
+    dataSnapshotHash: ids.snapshotHash,
   };
 }
-function summary() {
+function summary(ids: LabIds) {
   return {
     endingEquity: '112400',
     totalReturn: '12.40',
@@ -523,20 +644,20 @@ function summary() {
     benchmarkReturn: '9.10',
     dataSnapshot: {
       id: 'snapshot-id',
-      hash: 'snapshot-pit-069',
+      hash: ids.snapshotHash,
       dataCutoffAt: '2026-07-18T15:00:00.000Z',
       coverageStatus: 'partial',
     },
     warnings: [{ code: 'PARTIAL_POINT_IN_TIME_COVERAGE' }],
   };
 }
-function methodology() {
+function methodology(ids: LabIds) {
   return {
     engineVersion: 'backtest-engine-v1',
     executionPolicyVersion: 'next-open-v1',
     costPolicyVersion: 'cost-v1',
     eventOrderingPolicyVersion: 'deterministic-ordering-v1',
-    dataSnapshot: { hash: 'snapshot-pit-069' },
+    dataSnapshot: { hash: ids.snapshotHash },
   };
 }
 function series(type: string) {
@@ -566,11 +687,11 @@ function trades(offset: number) {
     fees: '2',
   }));
 }
-function experiment() {
+function experiment(ids: LabIds) {
   return {
-    id: experimentId,
+    id: ids.experimentId,
     name: 'Threshold grid',
-    strategyId,
+    strategyId: ids.strategyId,
     strategyRevision: 1,
     status: 'completed',
     combinationCount: 6,

@@ -333,6 +333,7 @@ function orchestration(
 
 function compatibility(child: ExperimentChildBinding) {
   return {
+    ownerUserId,
     strategyId,
     strategyRevision: 1,
     bindingHash: child.bindingHash,

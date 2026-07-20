@@ -80,6 +80,7 @@ export interface BacktestSummary {
   readonly endingEquity?: string | null;
   readonly totalReturn?: string | null;
   readonly annualizedReturn?: string | null;
+  readonly annualizedVolatility?: string | null;
   readonly maximumDrawdown?: string | null;
   readonly sharpe?: string | null;
   readonly sortino?: string | null;
@@ -92,6 +93,9 @@ export interface BacktestSummary {
   readonly totalFees?: string | null;
   readonly totalSlippage?: string | null;
   readonly benchmarkReturn?: string | null;
+  readonly excessReturn?: string | null;
+  readonly expectancy?: string | null;
+  readonly metrics?: Readonly<Record<string, BacktestMetricResult>>;
   readonly methodology?: Record<string, unknown>;
   readonly dataSnapshot?: {
     readonly id: string;
@@ -100,6 +104,15 @@ export interface BacktestSummary {
     readonly coverageStatus: string;
   };
   readonly warnings?: readonly { code: string; message?: string }[];
+}
+
+export interface BacktestMetricResult {
+  readonly value: string | null;
+  readonly status: 'complete' | 'notEvaluable';
+  readonly reasonCode: string | null;
+  readonly observationCount: number;
+  readonly methodologyVersion: string;
+  readonly warnings: readonly string[];
 }
 
 export interface SeriesPoint {

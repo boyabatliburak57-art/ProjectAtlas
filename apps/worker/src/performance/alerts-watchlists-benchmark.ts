@@ -171,9 +171,9 @@ async function evaluationBatch(
   for (let repetition = 0; repetition < 3; repetition += 1) {
     const event = marketEvent(`batch-${repetition}`, instrumentId, repetition);
     const started = performance.now();
-    for (const candidate of candidates) {
-      try {
-        const persisted = await repository.persistEvaluation({
+    try {
+      const persisted = await repository.persistEvaluations(
+        candidates.map((candidate) => ({
           candidate,
           event,
           evaluation: {
@@ -184,11 +184,11 @@ async function evaluationBatch(
           },
           evaluatedAt: new Date(CUTOFF.getTime() + repetition * 60_000),
           durationMs: 0,
-        });
-        if (persisted.duplicate) duplicateCount += 1;
-      } catch {
-        errors += 1;
-      }
+        })),
+      );
+      duplicateCount += persisted.filter((item) => item.duplicate).length;
+    } catch {
+      errors += candidates.length;
     }
     durations.push(performance.now() - started);
   }

@@ -202,7 +202,7 @@ test.beforeEach(async ({ page }, testInfo) => {
   } else {
     await mockScanner(page);
   }
-  await page.goto('/scanner');
+  await page.goto('/scanner', { waitUntil: 'domcontentloaded' });
   await expect(
     page.getByRole('heading', { name: 'Kural oluşturucu' }),
   ).toBeVisible();

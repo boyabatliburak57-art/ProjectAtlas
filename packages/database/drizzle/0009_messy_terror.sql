@@ -1,0 +1,1 @@
+CREATE INDEX "price_bars_snapshot_resolution_idx" ON "price_bars" USING btree ("provider_id","timeframe","instrument_id","open_time","revision" DESC NULLS LAST);

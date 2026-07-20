@@ -70,3 +70,57 @@ export class ApiDataResponseDto {
   @ApiProperty({ type: Object }) data!: unknown;
   @ApiProperty({ type: Object }) meta!: Record<string, unknown>;
 }
+
+export class BacktestMetricDto {
+  @ApiPropertyOptional({ nullable: true, type: String }) value!: string | null;
+  @ApiProperty({ enum: ['complete', 'notEvaluable'] }) status!: string;
+  @ApiPropertyOptional({ nullable: true, type: String })
+  reasonCode!: string | null;
+  @ApiProperty() observationCount!: number;
+  @ApiProperty() methodologyVersion!: string;
+  @ApiProperty({ type: [String] }) warnings!: string[];
+}
+
+export class BacktestMetricSetDto {
+  @ApiProperty({ type: BacktestMetricDto }) totalReturn!: BacktestMetricDto;
+  @ApiProperty({ type: BacktestMetricDto })
+  annualizedReturn!: BacktestMetricDto;
+  @ApiProperty({ type: BacktestMetricDto })
+  annualizedVolatility!: BacktestMetricDto;
+  @ApiProperty({ type: BacktestMetricDto }) sharpeRatio!: BacktestMetricDto;
+  @ApiProperty({ type: BacktestMetricDto }) sortinoRatio!: BacktestMetricDto;
+  @ApiProperty({ type: BacktestMetricDto }) calmarRatio!: BacktestMetricDto;
+  @ApiProperty({ type: BacktestMetricDto }) expectancy!: BacktestMetricDto;
+  @ApiProperty({ type: BacktestMetricDto }) profitFactor!: BacktestMetricDto;
+  @ApiProperty({ type: BacktestMetricDto }) turnover!: BacktestMetricDto;
+  @ApiProperty({ type: BacktestMetricDto }) benchmarkReturn!: BacktestMetricDto;
+  @ApiProperty({ type: BacktestMetricDto }) excessReturn!: BacktestMetricDto;
+}
+
+export class BacktestSummaryDto {
+  @ApiProperty() endingEquity!: string;
+  @ApiProperty() totalReturn!: string;
+  @ApiPropertyOptional({ nullable: true, type: String })
+  annualizedReturn!: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String })
+  annualizedVolatility!: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String }) sharpe!: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String }) sortino!:
+    | string
+    | null;
+  @ApiPropertyOptional({ nullable: true, type: String }) calmar!: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String })
+  expectancy!: string | null;
+  @ApiProperty() turnover!: string;
+  @ApiPropertyOptional({ nullable: true, type: String })
+  benchmarkReturn!: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String })
+  excessReturn!: string | null;
+  @ApiProperty({ type: BacktestMetricSetDto }) metrics!: BacktestMetricSetDto;
+  @ApiProperty({ type: Object }) methodology!: Record<string, unknown>;
+}
+
+export class BacktestSummaryResponseDto {
+  @ApiProperty({ type: BacktestSummaryDto }) data!: BacktestSummaryDto;
+  @ApiProperty({ type: Object }) meta!: Record<string, unknown>;
+}

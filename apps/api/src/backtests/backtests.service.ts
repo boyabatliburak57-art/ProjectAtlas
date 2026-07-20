@@ -488,6 +488,7 @@ export class ExperimentsService {
       strategyId: value.strategyId,
       strategyRevision: value.strategyRevision,
       dataSnapshotId: value.dataSnapshotId,
+      dataSnapshotHash: value.dataSnapshotHash,
       name: value.name,
       experimentHash: hash({ userId, ...value }),
       definition: value.definition,

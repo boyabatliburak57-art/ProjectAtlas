@@ -100,6 +100,7 @@ export interface ExperimentStore {
     readonly strategyId: string;
     readonly strategyRevision: number;
     readonly dataSnapshotId: string;
+    readonly dataSnapshotHash: string;
     readonly name: string;
     readonly experimentHash: string;
     readonly definition: Readonly<Record<string, unknown>>;

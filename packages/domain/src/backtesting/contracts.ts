@@ -81,11 +81,19 @@ export interface BacktestExecutionPlan {
   readonly liquidityPolicy?: BacktestLiquidityPolicy | undefined;
   readonly pointInTimePolicy?: BacktestPointInTimePolicy | undefined;
   readonly corporateActionPolicy?: BacktestCorporateActionPolicy | undefined;
+  readonly benchmark?: BacktestBenchmarkSeries | undefined;
   readonly maxConcurrentPositions: number;
   readonly fractionalShares: false;
   readonly allowShort: false;
   readonly allowLeverage: false;
   readonly liquidateAtEnd: boolean;
+}
+
+export interface BacktestBenchmarkSeries {
+  readonly code: string;
+  readonly adjustmentMode: 'raw' | 'splitAdjusted' | 'totalReturnAdjusted';
+  readonly dataCutoffAt: string;
+  readonly points: readonly BacktestCurvePoint[];
 }
 
 export interface BacktestBar {
@@ -181,6 +189,7 @@ export interface BacktestFill {
   readonly totalCosts: BacktestDecimal;
   readonly netCashEffect: BacktestDecimal;
   readonly partial: boolean;
+  readonly syntheticCorporateAction?: boolean | undefined;
   readonly signalAt: string;
   readonly filledAt: string;
   readonly reason:
@@ -216,10 +225,71 @@ export interface BacktestTrade {
   readonly openedAt: string;
   readonly closedAt: string;
   readonly realizedPnl: BacktestDecimal;
+  readonly grossPnl: BacktestDecimal;
+  readonly totalCosts: BacktestDecimal;
   readonly returnPercent: BacktestDecimal;
   readonly exitReason: Exclude<BacktestFill['reason'], 'entry'>;
   readonly entryFillId: string;
   readonly exitFillId: string;
+}
+
+export type BacktestMetricReasonCode =
+  | 'INSUFFICIENT_OBSERVATIONS'
+  | 'INVALID_INPUT'
+  | 'NON_POSITIVE_CAPITAL'
+  | 'PERIOD_TOO_SHORT'
+  | 'ZERO_VOLATILITY'
+  | 'ZERO_DOWNSIDE_DEVIATION'
+  | 'ZERO_DRAWDOWN'
+  | 'ZERO_CLOSED_TRADES'
+  | 'ZERO_LOSSES'
+  | 'MISSING_BENCHMARK'
+  | 'BENCHMARK_CONTEXT_MISMATCH'
+  | 'MISSING_BENCHMARK_DATES';
+
+export interface BacktestMetric {
+  readonly value: BacktestDecimal | null;
+  readonly status: 'complete' | 'notEvaluable';
+  readonly reasonCode: BacktestMetricReasonCode | null;
+  readonly observationCount: number;
+  readonly methodologyVersion: string;
+  readonly warnings: readonly string[];
+}
+
+export interface BacktestMetricSet {
+  readonly totalReturn: BacktestMetric;
+  readonly annualizedReturn: BacktestMetric;
+  readonly annualizedVolatility: BacktestMetric;
+  readonly sharpeRatio: BacktestMetric;
+  readonly sortinoRatio: BacktestMetric;
+  readonly calmarRatio: BacktestMetric;
+  readonly expectancy: BacktestMetric;
+  readonly profitFactor: BacktestMetric;
+  readonly turnover: BacktestMetric;
+  readonly benchmarkReturn: BacktestMetric;
+  readonly excessReturn: BacktestMetric;
+}
+
+export interface BacktestMetricMethodology {
+  readonly version: string;
+  readonly returnConvention: 'simple-close-to-close';
+  readonly annualizationFactor: 252;
+  readonly annualizedReturnDayCount: 365;
+  readonly riskFreeRateAnnual: BacktestDecimal;
+  readonly standardDeviation: 'sample';
+  readonly downsideTargetPeriodic: BacktestDecimal;
+  readonly turnover: {
+    readonly approach: 'gross';
+    readonly denominator: 'average-portfolio-equity';
+    readonly annualized: false;
+    readonly syntheticCorporateActionFills: 'excluded';
+  };
+  readonly benchmark: {
+    readonly adjustmentMode: 'same-as-strategy';
+    readonly dateAlignment: 'exact-date-intersection-no-forward-fill';
+    readonly range: 'same-start-and-end';
+    readonly dataCutoff: 'same-as-backtest-snapshot';
+  };
 }
 
 export interface BacktestCurvePoint {
@@ -271,6 +341,8 @@ export interface BacktestSummary {
   readonly profitFactor: BacktestDecimal | null;
   readonly exposurePercent: BacktestDecimal;
   readonly totalCosts: BacktestDecimal;
+  readonly metrics: BacktestMetricSet;
+  readonly methodology: BacktestMetricMethodology;
 }
 
 export interface PointInTimeFundamentalRevision {
@@ -318,6 +390,7 @@ export interface BacktestResult {
   readonly cashCurve: readonly BacktestCurvePoint[];
   readonly exposureCurve: readonly BacktestCurvePoint[];
   readonly drawdownCurve: readonly BacktestCurvePoint[];
+  readonly benchmarkCurve: readonly BacktestCurvePoint[];
   readonly warnings: readonly BacktestWarning[];
   readonly summary: BacktestSummary | null;
   readonly checkpoint: BacktestCheckpoint;

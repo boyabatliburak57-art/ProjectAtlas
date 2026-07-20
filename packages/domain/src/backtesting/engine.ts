@@ -28,6 +28,7 @@ import {
   createBacktestEventOrderKey,
   createOrderedBacktestTimeline,
 } from './timeline.js';
+import { calculateBacktestMetrics } from './metrics.js';
 
 interface MutablePosition {
   instrumentId: string;
@@ -56,6 +57,7 @@ interface MutableSimulation {
   exposureCurve: BacktestCurvePoint[];
   drawdownCurve: BacktestCurvePoint[];
   warnings: BacktestWarning[];
+  warningKeys: Set<string>;
   lastProcessedOrderKey: string | null;
 }
 
@@ -104,7 +106,23 @@ export class DeterministicBacktestEngine {
     const completed = processedBuckets === buckets.length;
     if (completed && plan.liquidateAtEnd) liquidateAtEnd(plan, simulation);
     const state = snapshotState(simulation);
-    const summary = completed ? createSummary(plan, simulation) : null;
+    const metricCalculation = completed
+      ? calculateBacktestMetrics({
+          initialEquity: plan.initialCash,
+          endingEquity: currentEquity(simulation).toString(),
+          equityCurve: simulation.equityCurve,
+          drawdownCurve: simulation.drawdownCurve,
+          fills: simulation.fills,
+          trades: simulation.trades,
+          benchmark: plan.benchmark,
+          adjustmentMode: plan.corporateActionPolicy?.adjustmentMode ?? 'raw',
+          dataCutoffAt: plan.pointInTimePolicy?.dataCutoffAt,
+        })
+      : null;
+    const summary =
+      metricCalculation === null
+        ? null
+        : createSummary(plan, simulation, metricCalculation);
     const checkpoint = createCheckpoint(
       plan,
       planHash,
@@ -122,6 +140,7 @@ export class DeterministicBacktestEngine {
       cashCurve: simulation.cashCurve,
       exposureCurve: simulation.exposureCurve,
       drawdownCurve: simulation.drawdownCurve,
+      benchmarkCurve: metricCalculation?.benchmarkCurve ?? [],
       warnings: simulation.warnings,
       summary,
     };
@@ -142,25 +161,22 @@ export class DeterministicBacktestEngine {
     const timestamp = events[0]!.timestamp;
     simulation.currentTime = timestamp;
 
-    for (const event of events.filter(
-      (item) => item.type === 'corporateAction',
-    )) {
-      applyCorporateAction(plan, simulation, event);
+    const bars: BacktestBar[] = [];
+    for (const event of events) {
+      if (event.type === 'corporateAction')
+        applyCorporateAction(plan, simulation, event);
+      else if (event.type === 'forcedExit')
+        executeForcedExit(plan, simulation, event);
+      else bars.push(event);
     }
-
-    for (const event of events.filter((item) => item.type === 'forcedExit')) {
-      executeForcedExit(plan, simulation, event);
-    }
-
-    const bars = events
-      .filter((event): event is BacktestBar => event.type === 'bar')
-      .sort(compareInstrument);
+    // The timeline's stable order already sorts equal-priority bars by
+    // instrument, so no per-bucket copy/sort is required here.
     executePendingOrders(plan, bars, simulation);
     executeRiskExits(plan, bars, simulation);
 
     for (const bar of bars) {
       if (!bar.isClosed) {
-        simulation.warnings.push(warning('BAR_NOT_CLOSED', bar));
+        addWarning(simulation, warning('BAR_NOT_CLOSED', bar));
         continue;
       }
       const history = histories.get(bar.instrumentId) ?? [];
@@ -179,11 +195,12 @@ export class DeterministicBacktestEngine {
         simulation,
       );
     }
+    simulation.pendingOrders.sort(compareOrders);
 
-    for (const event of events) {
-      simulation.processedEventIds.add(event.eventId);
-      simulation.lastProcessedOrderKey = createBacktestEventOrderKey(event);
-    }
+    for (const event of events) simulation.processedEventIds.add(event.eventId);
+    const lastEvent = events.at(-1);
+    if (lastEvent !== undefined)
+      simulation.lastProcessedOrderKey = createBacktestEventOrderKey(lastEvent);
     recordCurves(timestamp, simulation);
   }
 
@@ -209,7 +226,7 @@ export class DeterministicBacktestEngine {
       if (exit.status === 'matched') {
         simulation.pendingOrders.push(orderIntent(plan, bar, 'SELL', 'exit'));
       } else if (exit.status === 'notEvaluable') {
-        simulation.warnings.push(warning('SIGNAL_NOT_EVALUABLE', bar));
+        addWarning(simulation, warning('SIGNAL_NOT_EVALUABLE', bar));
       }
       return;
     }
@@ -226,7 +243,7 @@ export class DeterministicBacktestEngine {
       if (entry.status === 'matched') {
         simulation.pendingOrders.push(orderIntent(plan, bar, 'BUY', 'entry'));
       } else if (entry.status === 'notEvaluable') {
-        simulation.warnings.push(warning('SIGNAL_NOT_EVALUABLE', bar));
+        addWarning(simulation, warning('SIGNAL_NOT_EVALUABLE', bar));
       }
     } else if (
       position === undefined &&
@@ -236,9 +253,8 @@ export class DeterministicBacktestEngine {
         bar.timestamp,
       )
     ) {
-      simulation.warnings.push(warning('HISTORICAL_UNIVERSE_EXCLUDED', bar));
+      addWarning(simulation, warning('HISTORICAL_UNIVERSE_EXCLUDED', bar));
     }
-    simulation.pendingOrders.sort(compareOrders);
   }
 }
 
@@ -251,11 +267,7 @@ function executePendingOrders(
   const remaining: BacktestOrderIntent[] = [];
   for (const order of [...simulation.pendingOrders].sort(compareOrders)) {
     const bar = barsByInstrument.get(order.instrumentId);
-    if (
-      bar === undefined ||
-      !bar.isClosed ||
-      Date.parse(bar.timestamp) <= Date.parse(order.signalAt)
-    ) {
+    if (bar === undefined || !bar.isClosed || bar.timestamp <= order.signalAt) {
       remaining.push(order);
       continue;
     }
@@ -267,12 +279,12 @@ function executePendingOrders(
         bar.timestamp,
       )
     ) {
-      simulation.warnings.push(warning('HISTORICAL_UNIVERSE_EXCLUDED', bar));
+      addWarning(simulation, warning('HISTORICAL_UNIVERSE_EXCLUDED', bar));
       continue;
     }
     const price = optionalPrice(bar.open, 'open');
     if (price === null) {
-      simulation.warnings.push(warning('MISSING_EXECUTION_PRICE', bar));
+      addWarning(simulation, warning('MISSING_EXECUTION_PRICE', bar));
       remaining.push(order);
       continue;
     }
@@ -293,7 +305,7 @@ function executeBuy(
 ): boolean {
   if (simulation.positions.has(order.instrumentId)) return true;
   if (simulation.positions.size >= plan.maxConcurrentPositions) {
-    simulation.warnings.push(warning('MAX_POSITIONS_REACHED', bar));
+    addWarning(simulation, warning('MAX_POSITIONS_REACHED', bar));
     return true;
   }
   const sizing = sizingBudget(plan, simulation);
@@ -301,7 +313,7 @@ function executeBuy(
     plan.positionSizing.type === 'fixedCash' &&
     sizing.compare(simulation.cash) > 0
   ) {
-    simulation.warnings.push(warning('INSUFFICIENT_CASH', bar));
+    addWarning(simulation, warning('INSUFFICIENT_CASH', bar));
     return true;
   }
   const maximumWeight = plan.riskPolicy
@@ -318,7 +330,7 @@ function executeBuy(
     budget.compare(simulation.cash) > 0 ? simulation.cash : budget;
   const requestedQuantity = floorPositiveInteger(spendable.dividedBy(price));
   if (requestedQuantity.isZero()) {
-    simulation.warnings.push(warning('INSUFFICIENT_CASH', bar));
+    addWarning(simulation, warning('INSUFFICIENT_CASH', bar));
     return true;
   }
   const quantity = applyParticipationLimit(
@@ -335,7 +347,7 @@ function executeBuy(
     policy: costPolicyOrDefault(plan.costPolicy),
   });
   if (costs.cashRequired.compare(simulation.cash) > 0) {
-    simulation.warnings.push(warning('INSUFFICIENT_CASH', bar));
+    addWarning(simulation, warning('INSUFFICIENT_CASH', bar));
     return true;
   }
   const fill = createFill(
@@ -407,6 +419,15 @@ function executeSell(
     position.costBasis = remainingQuantity.times(position.averageCost);
   }
   simulation.fills.push(fill);
+  const entryFill = simulation.fills.find(
+    (item) => item.id === position.entryFillId,
+  );
+  const allocatedEntryCosts = entryFill
+    ? Decimal.parse(entryFill.totalCosts)
+        .times(quantity)
+        .dividedBy(Decimal.parse(entryFill.quantity))
+    : Decimal.ZERO;
+  const totalCosts = allocatedEntryCosts.plus(Decimal.parse(fill.totalCosts));
   const trade: BacktestTrade = {
     id: `trade:${createStableParameterHash({ entryFillId: position.entryFillId, exitFillId: fill.id })}`,
     instrumentId: position.instrumentId,
@@ -417,6 +438,8 @@ function executeSell(
     openedAt: position.openedAt,
     closedAt: filledAt,
     realizedPnl: decimalString(pnl, 'realizedPnl'),
+    grossPnl: decimalString(pnl.plus(totalCosts), 'grossPnl'),
+    totalCosts: decimalString(totalCosts, 'totalCosts'),
     returnPercent: decimalString(
       pnl.dividedBy(soldCost).times(Decimal.parse('100')),
       'returnPercent',
@@ -483,7 +506,7 @@ function executeRiskExits(
       protectivePrice !== null && low.compare(protectivePrice) <= 0;
     const takeTriggered = takePrice !== null && high.compare(takePrice) >= 0;
     if (protectiveTriggered && takeTriggered) {
-      simulation.warnings.push(warning('SAME_BAR_RISK_AMBIGUITY', bar));
+      addWarning(simulation, warning('SAME_BAR_RISK_AMBIGUITY', bar));
     }
     const riskReason =
       protectiveTriggered && trailingPrice === protectivePrice
@@ -567,7 +590,7 @@ function applyCorporateAction(
     (cutoff !== undefined &&
       Date.parse(event.revisionAvailableAt) > Date.parse(cutoff))
   ) {
-    simulation.warnings.push(warning('CORPORATE_ACTION_NOT_AVAILABLE', event));
+    addWarning(simulation, warning('CORPORATE_ACTION_NOT_AVAILABLE', event));
     return;
   }
   const position = simulation.positions.get(event.instrumentId);
@@ -579,7 +602,8 @@ function applyCorporateAction(
   };
   if (event.actionType === 'split' || event.actionType === 'bonusShare') {
     if (policy.adjustmentMode !== 'raw') {
-      simulation.warnings.push(
+      addWarning(
+        simulation,
         warning('CORPORATE_ACTION_DOUBLE_APPLICATION_PREVENTED', event),
       );
       return;
@@ -595,7 +619,8 @@ function applyCorporateAction(
   }
   if (event.actionType === 'dividend') {
     if (policy.adjustmentMode === 'totalReturnAdjusted') {
-      simulation.warnings.push(
+      addWarning(
+        simulation,
         warning('CORPORATE_ACTION_DOUBLE_APPLICATION_PREVENTED', event),
       );
       return;
@@ -610,7 +635,7 @@ function applyCorporateAction(
     return;
   }
   if (policy.delistingPolicy === 'notEvaluable') {
-    simulation.warnings.push(warning('DELISTING_NOT_EVALUABLE', event));
+    addWarning(simulation, warning('DELISTING_NOT_EVALUABLE', event));
     return;
   }
   const settlement =
@@ -620,7 +645,7 @@ function applyCorporateAction(
         ? simulation.lastPrices.get(event.instrumentId)
         : positiveDecimal(event.settlementPrice, 'settlementPrice');
   if (settlement === undefined) {
-    simulation.warnings.push(warning('DELISTING_NOT_EVALUABLE', event));
+    addWarning(simulation, warning('DELISTING_NOT_EVALUABLE', event));
     return;
   }
   const order: BacktestOrderIntent = {
@@ -653,7 +678,7 @@ function executeForcedExit(
   if (!simulation.positions.has(event.instrumentId)) return;
   const price = optionalPrice(event.price, 'forcedExitPrice');
   if (price === null) {
-    simulation.warnings.push(warning('FORCED_EXIT_PRICE_MISSING', event));
+    addWarning(simulation, warning('FORCED_EXIT_PRICE_MISSING', event));
     return;
   }
   const order: BacktestOrderIntent = {
@@ -759,6 +784,7 @@ function currentEquity(simulation: MutableSimulation): Decimal {
 function createSummary(
   plan: BacktestExecutionPlan,
   simulation: MutableSimulation,
+  metricCalculation: ReturnType<typeof calculateBacktestMetrics>,
 ): BacktestSummary {
   const initial = positiveDecimal(plan.initialCash, 'initialCash');
   const ending = currentEquity(simulation);
@@ -825,6 +851,8 @@ function createSummary(
       ),
       'totalCosts',
     ),
+    metrics: metricCalculation.metrics,
+    methodology: metricCalculation.methodology,
   };
 }
 
@@ -853,6 +881,7 @@ function createSimulation(plan: BacktestExecutionPlan): MutableSimulation {
           },
         ]
       : [],
+    warningKeys: new Set(costFree ? ['COST_FREE_BACKTEST:*'] : []),
     lastProcessedOrderKey: null,
   };
 }
@@ -889,7 +918,9 @@ function createCheckpoint(
     planHash,
     timelineHash,
     lastProcessedOrderKey: simulation.lastProcessedOrderKey,
-    processedEventIds: [...simulation.processedEventIds].sort(),
+    // Events enter this Set in deterministic timeline order. Retaining insertion
+    // order avoids an O(n log n) sort at every durable checkpoint.
+    processedEventIds: [...simulation.processedEventIds],
     state,
     fills: simulation.fills,
     trades: simulation.trades,
@@ -902,7 +933,7 @@ function createCheckpoint(
   return {
     version: 1,
     ...payload,
-    stateHash: createStableParameterHash(payload),
+    stateHash: createStableParameterHash(checkpointHashPayload(payload)),
   };
 }
 
@@ -968,17 +999,22 @@ function restoreCheckpoint(
     exposureCurve: [...checkpoint.exposureCurve],
     drawdownCurve: [...checkpoint.drawdownCurve],
     warnings: [...checkpoint.warnings],
+    warningKeys: new Set(
+      checkpoint.warnings.map((item) => `${item.code}:${item.instrumentId}`),
+    ),
     lastProcessedOrderKey: checkpoint.lastProcessedOrderKey,
   };
 }
 
-function checkpointHashPayload(checkpoint: BacktestCheckpoint): object {
+function checkpointHashPayload(
+  checkpoint: Omit<BacktestCheckpoint, 'version' | 'stateHash'>,
+): object {
   return {
     engineVersion: checkpoint.engineVersion,
     planHash: checkpoint.planHash,
     timelineHash: checkpoint.timelineHash,
     lastProcessedOrderKey: checkpoint.lastProcessedOrderKey,
-    processedEventIds: checkpoint.processedEventIds,
+    processedEventIdsHash: hashStringSequence(checkpoint.processedEventIds),
     state: checkpoint.state,
     fills: checkpoint.fills,
     trades: checkpoint.trades,
@@ -988,6 +1024,30 @@ function checkpointHashPayload(checkpoint: BacktestCheckpoint): object {
     drawdownCurve: checkpoint.drawdownCurve,
     warnings: checkpoint.warnings,
   };
+}
+
+function hashStringSequence(values: readonly string[]): string {
+  let first = 0x81_1c_9d_c5;
+  let second = 0x9e_37_79_b9;
+  const updateByte = (value: number): void => {
+    first = Math.imul(first ^ value, 0x01_00_01_93) >>> 0;
+    second = Math.imul(second ^ value, 0x01_00_01_93) >>> 0;
+  };
+  for (const value of values) {
+    let length = value.length;
+    do {
+      updateByte(length & 0xff);
+      length >>>= 8;
+    } while (length > 0);
+    updateByte(0xff);
+    for (let index = 0; index < value.length; index += 1) {
+      const code = value.charCodeAt(index);
+      updateByte(code & 0xff);
+      updateByte(code >>> 8);
+    }
+    updateByte(0xfe);
+  }
+  return `fnv1a64:${first.toString(16).padStart(8, '0')}${second.toString(16).padStart(8, '0')}`;
 }
 
 function validatePlan(plan: BacktestExecutionPlan): void {
@@ -1193,7 +1253,7 @@ function addDuplicateWarnings(
       continue;
     const event = events.find((item) => item.eventId === eventId);
     if (event !== undefined)
-      simulation.warnings.push(warning('DUPLICATE_EVENT_IGNORED', event));
+      addWarning(simulation, warning('DUPLICATE_EVENT_IGNORED', event));
   }
 }
 
@@ -1244,7 +1304,7 @@ function applyParticipationLimit(
   const policy = plan.liquidityPolicy;
   if (policy === undefined || policy.type === 'unlimited') return requested;
   if (bar.volume === null) {
-    simulation.warnings.push(warning('LIQUIDITY_VOLUME_UNAVAILABLE', bar));
+    addWarning(simulation, warning('LIQUIDITY_VOLUME_UNAVAILABLE', bar));
     return null;
   }
   const volume = nonNegativeDecimal(bar.volume, 'volume');
@@ -1260,7 +1320,7 @@ function applyParticipationLimit(
   );
   if (requested.compare(maximum) <= 0) return requested;
   if (policy.partialFillPolicy === 'reject' || maximum.isZero()) {
-    simulation.warnings.push(warning('PARTICIPATION_LIMIT_REJECTED', bar));
+    addWarning(simulation, warning('PARTICIPATION_LIMIT_REJECTED', bar));
     return null;
   }
   return maximum;
@@ -1320,6 +1380,20 @@ function compareInstrument(
     left.symbol.localeCompare(right.symbol) ||
     left.instrumentId.localeCompare(right.instrumentId)
   );
+}
+
+function addWarning(
+  simulation: MutableSimulation,
+  value: BacktestWarning,
+): void {
+  if (value.code === 'DUPLICATE_EVENT_IGNORED') {
+    simulation.warnings.push(value);
+    return;
+  }
+  const key = `${value.code}:${value.instrumentId}`;
+  if (simulation.warningKeys.has(key)) return;
+  simulation.warningKeys.add(key);
+  simulation.warnings.push(value);
 }
 
 function warning(

@@ -2,15 +2,13 @@ import { createHash } from 'node:crypto';
 
 import {
   backtestDataSnapshots,
-  backtestFills,
-  backtestOrders,
   backtestRuns,
   backtestSeriesChunks,
   backtestSummaries,
-  backtestTrades,
   type Database,
 } from '@atlas/database';
 import {
+  BACKTEST_METRIC_POLICY,
   Decimal,
   type BacktestRunCreationInput,
   type BacktestRunRecord,
@@ -34,6 +32,8 @@ const statusToDatabase: Record<BacktestRunStatus, string> = {
   cancelled: 'cancelled',
   expired: 'expired',
 };
+
+export const BACKTEST_RESULT_INSERT_BATCH_SIZE = 20_000;
 
 export class PostgresBacktestRuntimeRepository
   implements BacktestRunRepository, BacktestWorkerRepository
@@ -79,7 +79,7 @@ export class PostgresBacktestRuntimeRepository
         executionPolicyVersion: input.executionPlan.executionPolicyVersion,
         costPolicyVersion:
           input.executionPlan.costPolicy?.version ?? 'cost-free-v1',
-        metricPolicyVersion: 'backtest-summary-v1',
+        metricPolicyVersion: BACKTEST_METRIC_POLICY.version,
         eventOrderingPolicyVersion:
           input.executionPlan.eventOrderingPolicyVersion,
         roundingPolicyVersion: input.executionPlan.roundingPolicyVersion,
@@ -237,113 +237,187 @@ export class PostgresBacktestRuntimeRepository
   ): Promise<void> {
     const summary = input.result.summary;
     if (summary === null) throw new Error('BACKTEST_RESULT_NOT_COMPLETED');
+    const existingSummary = await this.database
+      .select({ runId: backtestSummaries.runId })
+      .from(backtestSummaries)
+      .where(eq(backtestSummaries.runId, input.run.id))
+      .limit(1);
+    // Orders, fills, trades, series, summary and terminal state are committed in
+    // one PostgreSQL transaction below. A summary therefore proves that this
+    // exact run result is already durable; replay must not rebuild and resend
+    // every conflict-protected row.
+    if (existingSummary[0] !== undefined) return;
     await this.database.transaction(async (transaction) => {
       const orderIds = new Map<string, string>();
-      for (const [index, fill] of input.result.fills.entries()) {
+      const orderRows = input.result.fills.map((fill, index) => {
         const orderId = stableUuid(input.run.id, 'order', fill.orderIntentId);
         orderIds.set(fill.orderIntentId, orderId);
-        await transaction
-          .insert(backtestOrders)
-          .values({
-            id: orderId,
-            runId: input.run.id,
-            ownerUserId: input.run.requestedBy,
-            instrumentId: fill.instrumentId,
-            orderSequence: index,
-            eventAt: new Date(fill.signalAt),
-            side: fill.side.toLowerCase(),
-            orderType: 'market',
-            status: fill.partial ? 'partially_filled' : 'filled',
-            requestedQuantity: fill.requestedQuantity,
-            signalPrice: fill.referencePrice,
-            reasonCode: fill.reason,
-          })
-          .onConflictDoNothing({
-            target: [backtestOrders.runId, backtestOrders.orderSequence],
-          });
-      }
+        return {
+          id: orderId,
+          runId: input.run.id,
+          ownerUserId: input.run.requestedBy,
+          instrumentId: fill.instrumentId,
+          orderSequence: index,
+          eventAt: new Date(fill.signalAt),
+          side: fill.side.toLowerCase(),
+          orderType: 'market',
+          status: fill.partial ? 'partially_filled' : 'filled',
+          requestedQuantity: fill.requestedQuantity,
+          signalPrice: fill.referencePrice,
+          reasonCode: fill.reason,
+        };
+      });
+      if (orderRows.length > 0)
+        await transaction.execute(sql`
+          insert into backtest_orders (
+            id, run_id, owner_user_id, instrument_id, order_sequence,
+            event_at, side, order_type, status, requested_quantity,
+            signal_price, reason_code
+          )
+          select
+            item.id::uuid, item."runId"::uuid, item."ownerUserId"::uuid,
+            item."instrumentId"::uuid, item."orderSequence",
+            item."eventAt"::timestamptz, item.side, item."orderType",
+            item.status, item."requestedQuantity"::numeric,
+            item."signalPrice"::numeric, item."reasonCode"
+          from jsonb_to_recordset(${JSON.stringify(orderRows)}::jsonb) as item(
+            id text, "runId" text, "ownerUserId" text, "instrumentId" text,
+            "orderSequence" integer, "eventAt" text, side text,
+            "orderType" text, status text, "requestedQuantity" text,
+            "signalPrice" text, "reasonCode" text
+          )
+          on conflict (run_id, order_sequence) do nothing
+        `);
       const fillIds = new Map<string, string>();
-      for (const [index, fill] of input.result.fills.entries()) {
+      const fillRows = input.result.fills.map((fill, index) => {
         const fillId = stableUuid(input.run.id, 'fill', fill.id);
         fillIds.set(fill.id, fillId);
+        return {
+          id: fillId,
+          runId: input.run.id,
+          ownerUserId: input.run.requestedBy,
+          orderId: orderIds.get(fill.orderIntentId)!,
+          instrumentId: fill.instrumentId,
+          fillSequence: index,
+          filledAt: new Date(fill.filledAt),
+          quantity: fill.quantity,
+          rawPrice: fill.referencePrice,
+          fillPrice: fill.price,
+          commission: fill.commission,
+          slippageCost: fill.slippageAmount,
+          fee: fill.fixedFee,
+          tax: fill.tax,
+          deduplicationKey: `${input.run.id}:${fill.deduplicationKey}`,
+          metadata: { engineFillId: fill.id, reason: fill.reason },
+        };
+      });
+      if (fillRows.length > 0)
+        await transaction.execute(sql`
+          insert into backtest_fills (
+            id, run_id, owner_user_id, order_id, instrument_id, fill_sequence,
+            filled_at, quantity, raw_price, fill_price, commission,
+            slippage_cost, fee, tax, deduplication_key, metadata
+          )
+          select
+            item.id::uuid, item."runId"::uuid, item."ownerUserId"::uuid,
+            item."orderId"::uuid, item."instrumentId"::uuid,
+            item."fillSequence", item."filledAt"::timestamptz,
+            item.quantity::numeric, item."rawPrice"::numeric,
+            item."fillPrice"::numeric, item.commission::numeric,
+            item."slippageCost"::numeric, item.fee::numeric,
+            item.tax::numeric, item."deduplicationKey", item.metadata
+          from jsonb_to_recordset(${JSON.stringify(fillRows)}::jsonb) as item(
+            id text, "runId" text, "ownerUserId" text, "orderId" text,
+            "instrumentId" text, "fillSequence" integer, "filledAt" text,
+            quantity text, "rawPrice" text, "fillPrice" text,
+            commission text, "slippageCost" text, fee text, tax text,
+            "deduplicationKey" text, metadata jsonb
+          )
+          on conflict (deduplication_key) do nothing
+        `);
+      const tradeRows = input.result.trades.map((trade, index) => ({
+        id: stableUuid(input.run.id, 'trade', trade.id),
+        runId: input.run.id,
+        ownerUserId: input.run.requestedBy,
+        instrumentId: trade.instrumentId,
+        tradeSequence: index,
+        entryFillId: fillIds.get(trade.entryFillId)!,
+        exitFillId: fillIds.get(trade.exitFillId)!,
+        openedAt: new Date(trade.openedAt),
+        closedAt: new Date(trade.closedAt),
+        quantity: trade.quantity,
+        entryPrice: trade.entryPrice,
+        exitPrice: trade.exitPrice,
+        grossPnl: trade.grossPnl,
+        netPnl: trade.realizedPnl,
+        totalCost: trade.totalCosts,
+        returnRate: trade.returnPercent,
+        holdingBars: 0,
+        closeReason: trade.exitReason,
+      }));
+      if (tradeRows.length > 0)
+        await transaction.execute(sql`
+          insert into backtest_trades (
+            id, run_id, owner_user_id, instrument_id, trade_sequence,
+            entry_fill_id, exit_fill_id, opened_at, closed_at, quantity,
+            entry_price, exit_price, gross_pnl, net_pnl, total_cost,
+            return_rate, holding_bars, close_reason
+          )
+          select
+            item.id::uuid, item."runId"::uuid, item."ownerUserId"::uuid,
+            item."instrumentId"::uuid, item."tradeSequence",
+            item."entryFillId"::uuid, item."exitFillId"::uuid,
+            item."openedAt"::timestamptz, item."closedAt"::timestamptz,
+            item.quantity::numeric, item."entryPrice"::numeric,
+            item."exitPrice"::numeric, item."grossPnl"::numeric,
+            item."netPnl"::numeric, item."totalCost"::numeric,
+            item."returnRate"::numeric, item."holdingBars", item."closeReason"
+          from jsonb_to_recordset(${JSON.stringify(tradeRows)}::jsonb) as item(
+            id text, "runId" text, "ownerUserId" text, "instrumentId" text,
+            "tradeSequence" integer, "entryFillId" text, "exitFillId" text,
+            "openedAt" text, "closedAt" text, quantity text,
+            "entryPrice" text, "exitPrice" text, "grossPnl" text,
+            "netPnl" text, "totalCost" text, "returnRate" text,
+            "holdingBars" integer, "closeReason" text
+          )
+          on conflict (run_id, trade_sequence) do nothing
+        `);
+      const seriesRows = resultSeries(input.result).flatMap((series) =>
+        [...chunk(series.points, 1_000).entries()].flatMap(
+          ([chunkIndex, points]) =>
+            points.length === 0
+              ? []
+              : [
+                  {
+                    id: stableUuid(
+                      input.run.id,
+                      series.type,
+                      String(chunkIndex),
+                    ),
+                    runId: input.run.id,
+                    ownerUserId: input.run.requestedBy,
+                    seriesType: series.type,
+                    chunkIndex,
+                    rangeStart: new Date(points[0]!.timestamp),
+                    rangeEnd: new Date(points.at(-1)!.timestamp),
+                    pointCount: points.length,
+                    payload: points,
+                    checksum: stableHash(points),
+                  },
+                ],
+        ),
+      );
+      if (seriesRows.length > 0)
         await transaction
-          .insert(backtestFills)
-          .values({
-            id: fillId,
-            runId: input.run.id,
-            ownerUserId: input.run.requestedBy,
-            orderId: orderIds.get(fill.orderIntentId)!,
-            instrumentId: fill.instrumentId,
-            fillSequence: index,
-            filledAt: new Date(fill.filledAt),
-            quantity: fill.quantity,
-            rawPrice: fill.referencePrice,
-            fillPrice: fill.price,
-            commission: fill.commission,
-            slippageCost: fill.slippageAmount,
-            fee: fill.fixedFee,
-            tax: fill.tax,
-            deduplicationKey: `${input.run.id}:${fill.deduplicationKey}`,
-            metadata: { engineFillId: fill.id, reason: fill.reason },
-          })
-          .onConflictDoNothing({ target: backtestFills.deduplicationKey });
-      }
-      for (const [index, trade] of input.result.trades.entries()) {
-        await transaction
-          .insert(backtestTrades)
-          .values({
-            id: stableUuid(input.run.id, 'trade', trade.id),
-            runId: input.run.id,
-            ownerUserId: input.run.requestedBy,
-            instrumentId: trade.instrumentId,
-            tradeSequence: index,
-            entryFillId: fillIds.get(trade.entryFillId)!,
-            exitFillId: fillIds.get(trade.exitFillId)!,
-            openedAt: new Date(trade.openedAt),
-            closedAt: new Date(trade.closedAt),
-            quantity: trade.quantity,
-            entryPrice: trade.entryPrice,
-            exitPrice: trade.exitPrice,
-            grossPnl: trade.realizedPnl,
-            netPnl: trade.realizedPnl,
-            totalCost: '0',
-            returnRate: trade.returnPercent,
-            holdingBars: 0,
-            closeReason: trade.exitReason,
-          })
+          .insert(backtestSeriesChunks)
+          .values(seriesRows)
           .onConflictDoNothing({
-            target: [backtestTrades.runId, backtestTrades.tradeSequence],
+            target: [
+              backtestSeriesChunks.runId,
+              backtestSeriesChunks.seriesType,
+              backtestSeriesChunks.chunkIndex,
+            ],
           });
-      }
-      for (const series of resultSeries(input.result)) {
-        for (const [chunkIndex, points] of chunk(
-          series.points,
-          1_000,
-        ).entries()) {
-          if (points.length === 0) continue;
-          await transaction
-            .insert(backtestSeriesChunks)
-            .values({
-              id: stableUuid(input.run.id, series.type, String(chunkIndex)),
-              runId: input.run.id,
-              ownerUserId: input.run.requestedBy,
-              seriesType: series.type,
-              chunkIndex,
-              rangeStart: new Date(points[0]!.timestamp),
-              rangeEnd: new Date(points.at(-1)!.timestamp),
-              pointCount: points.length,
-              payload: points,
-              checksum: stableHash(points),
-            })
-            .onConflictDoNothing({
-              target: [
-                backtestSeriesChunks.runId,
-                backtestSeriesChunks.seriesType,
-                backtestSeriesChunks.chunkIndex,
-              ],
-            });
-        }
-      }
       await transaction
         .insert(backtestSummaries)
         .values({
@@ -351,19 +425,28 @@ export class PostgresBacktestRuntimeRepository
           ownerUserId: input.run.requestedBy,
           endingEquity: summary.endingEquity,
           totalReturn: summary.totalReturnPercent,
+          annualizedReturn: metricValue(summary.metrics.annualizedReturn),
           maximumDrawdown: summary.maximumDrawdownPercent,
+          volatility: metricValue(summary.metrics.annualizedVolatility),
+          sharpeRatio: metricValue(summary.metrics.sharpeRatio),
+          sortinoRatio: metricValue(summary.metrics.sortinoRatio),
+          calmarRatio: metricValue(summary.metrics.calmarRatio),
           winRate: summary.winRatePercent,
           profitFactor: summary.profitFactor,
-          turnover: '0',
+          expectancy: metricValue(summary.metrics.expectancy),
+          turnover: requiredMetricValue(summary.metrics.turnover, 'turnover'),
           exposure: summary.exposurePercent,
           totalFees: summary.totalCosts,
           totalSlippage: sum(
             input.result.fills.map((fill) => fill.slippageAmount),
           ),
           tradeCount: summary.tradeCount,
+          benchmarkReturn: metricValue(summary.metrics.benchmarkReturn),
           methodology: {
             engineVersion: input.run.executionPlan.engineVersion,
             resultHash: input.result.resultHash,
+            metricPolicy: summary.methodology,
+            metrics: summary.metrics,
           },
           warnings: input.result.warnings.map((warning) => ({ ...warning })),
           calculatedAt: input.completedAt,
@@ -483,10 +566,7 @@ function stableHash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
-function chunk<T>(
-  values: readonly T[],
-  size: number,
-): readonly (readonly T[])[] {
+function chunk<T>(values: readonly T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let index = 0; index < values.length; index += size)
     chunks.push(values.slice(index, index + size));
@@ -503,7 +583,21 @@ function resultSeries(
     { type: 'cash' as const, points: result.cashCurve },
     { type: 'exposure' as const, points: result.exposureCurve },
     { type: 'drawdown' as const, points: result.drawdownCurve },
+    { type: 'benchmark' as const, points: result.benchmarkCurve },
   ];
+}
+
+function metricValue(metric: { readonly value: string | null }): string | null {
+  return metric.value;
+}
+
+function requiredMetricValue(
+  metric: { readonly value: string | null; readonly status: string },
+  name: string,
+): string {
+  if (metric.status !== 'complete' || metric.value === null)
+    throw new Error(`BACKTEST_REQUIRED_METRIC_NOT_EVALUABLE:${name}`);
+  return metric.value;
 }
 
 function sum(values: readonly string[]): string {

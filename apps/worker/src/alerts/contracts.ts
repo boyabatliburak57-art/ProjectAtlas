@@ -35,6 +35,14 @@ export interface PersistEvaluationResult {
   readonly state: AlertState | null;
 }
 
+export interface AlertEvaluationPersistenceInput {
+  readonly candidate: AlertCandidate;
+  readonly event: AlertEvaluationEvent;
+  readonly evaluation: AlertSourceEvaluation;
+  readonly evaluatedAt: Date;
+  readonly durationMs: number;
+}
+
 export interface AlertTriggerSink {
   handle(triggerIds: readonly string[]): Promise<void>;
 }
@@ -43,13 +51,12 @@ export interface AlertEvaluationRepository {
   findCandidates(
     event: AlertEvaluationEvent,
   ): Promise<readonly AlertCandidate[]>;
-  persistEvaluation(input: {
-    readonly candidate: AlertCandidate;
-    readonly event: AlertEvaluationEvent;
-    readonly evaluation: AlertSourceEvaluation;
-    readonly evaluatedAt: Date;
-    readonly durationMs: number;
-  }): Promise<PersistEvaluationResult>;
+  persistEvaluation(
+    input: AlertEvaluationPersistenceInput,
+  ): Promise<PersistEvaluationResult>;
+  persistEvaluations?(
+    inputs: readonly AlertEvaluationPersistenceInput[],
+  ): Promise<readonly PersistEvaluationResult[]>;
   listCatchUpEvents(limit: number): Promise<readonly AlertEvaluationEvent[]>;
 }
 

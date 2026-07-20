@@ -345,6 +345,7 @@ function compatibilityKey(
   child: ExperimentChildBinding,
 ): ExperimentRunCompatibilityKey {
   return {
+    ownerUserId: input.experiment.ownerUserId,
     strategyId: input.experiment.strategyId,
     strategyRevision: input.experiment.strategyRevision,
     bindingHash: child.bindingHash,

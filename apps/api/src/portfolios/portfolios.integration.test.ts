@@ -432,18 +432,19 @@ describe('Portfolio API', () => {
   });
 
   it('replays an identical transaction request and conflicts on changed payload', async () => {
+    const idempotencyKey = `portfolio-transaction-${portfolioId}`;
     const body = {
       type: 'cashDeposit',
       tradeAt: at.toISOString(),
       cashAmount: '100.00',
     };
-    await createTransaction('same-key', body).then((value) =>
+    await createTransaction(idempotencyKey, body).then((value) =>
       expect(value.status).toBe(201),
     );
-    const replay = await createTransaction('same-key', body);
+    const replay = await createTransaction(idempotencyKey, body);
     expect(replay.status).toBe(200);
     expect(replay.body.meta.replayed).toBe(true);
-    const conflict = await createTransaction('same-key', {
+    const conflict = await createTransaction(idempotencyKey, {
       ...body,
       cashAmount: '101.00',
     });

@@ -19,22 +19,44 @@ export interface BacktestOperandValueResolver {
 }
 
 export class ScannerBacktestSignalEvaluator implements BacktestSignalEvaluator {
+  private readonly validatedBarLengths = new WeakMap<
+    readonly BacktestBar[],
+    number
+  >();
+  private readonly operandsByRule = new WeakMap<
+    ScanRuleAst,
+    readonly ScanOperand[]
+  >();
+  private readonly operandKeys = new WeakMap<object, string>();
+
   constructor(private readonly resolver?: BacktestOperandValueResolver) {}
 
   evaluate(
     rule: ScanRuleAst,
     context: BacktestSignalContext,
   ): ScanRuleEvaluation {
-    assertNoFutureOrOpenBars(context);
+    assertNoFutureOrOpenBars(context, this.validatedBarLengths);
     const values = new Map<string, PreparedOperandValue>();
-    for (const operand of collectOperands(rule)) {
+    const operands = this.operandsByRule.get(rule) ?? collectOperands(rule);
+    this.operandsByRule.set(rule, operands);
+    for (const operand of operands) {
       const resolved =
         resolveBarOperand(operand, context.bars) ??
         this.resolver?.resolve(operand, context);
       if (resolved !== undefined)
-        values.set(createScanOperandKey(operand), resolved);
+        values.set(this.operandKey(operand), resolved);
     }
     return evaluateScanRule(rule, values);
+  }
+
+  private operandKey(operand: ScanOperand): string {
+    if (typeof operand !== 'object' || operand === null)
+      return createScanOperandKey(operand);
+    const cached = this.operandKeys.get(operand);
+    if (cached !== undefined) return cached;
+    const key = createScanOperandKey(operand);
+    this.operandKeys.set(operand, key);
+    return key;
   }
 }
 
@@ -77,13 +99,25 @@ function collectOperands(rule: ScanRuleAst): readonly ScanOperand[] {
   return [...operands.values()];
 }
 
-function assertNoFutureOrOpenBars(context: BacktestSignalContext): void {
-  const signalTime = Date.parse(context.signalAt);
-  if (
-    context.bars.some(
-      (bar) => !bar.isClosed || Date.parse(bar.timestamp) > signalTime,
-    )
-  ) {
+function assertNoFutureOrOpenBars(
+  context: BacktestSignalContext,
+  validatedBarLengths: WeakMap<readonly BacktestBar[], number>,
+): void {
+  const latest = context.bars.at(-1);
+  if (latest !== undefined && latest.timestamp > context.signalAt)
     throw new Error('BACKTEST_SIGNAL_CONTEXT_LOOKAHEAD');
+  const cachedLength = validatedBarLengths.get(context.bars) ?? 0;
+  const start = cachedLength <= context.bars.length ? cachedLength : 0;
+  for (let index = start; index < context.bars.length; index += 1) {
+    const bar = context.bars[index]!;
+    const previous = context.bars[index - 1];
+    if (
+      !bar.isClosed ||
+      bar.timestamp > context.signalAt ||
+      (previous !== undefined && previous.timestamp > bar.timestamp)
+    ) {
+      throw new Error('BACKTEST_SIGNAL_CONTEXT_LOOKAHEAD');
+    }
   }
+  validatedBarLengths.set(context.bars, context.bars.length);
 }

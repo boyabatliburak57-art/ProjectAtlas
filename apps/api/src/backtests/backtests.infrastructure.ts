@@ -14,6 +14,7 @@ import {
   strategyRevisions,
 } from '@atlas/database';
 import {
+  BACKTEST_METRIC_POLICY,
   BacktestRunApplicationService,
   createStrategyEntity,
   createStrategyRevision,
@@ -33,6 +34,7 @@ import {
   ATLAS_JOB_NAMES,
   ATLAS_QUEUE_NAMES,
   type BacktestRunQueuePayload,
+  type ExperimentQueuePayload,
 } from '@atlas/types';
 import { Injectable, type OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -272,7 +274,7 @@ export class PostgresBacktestApiStore
         executionPolicyVersion: input.executionPlan.executionPolicyVersion,
         costPolicyVersion:
           input.executionPlan.costPolicy?.version ?? 'cost-free-v1',
-        metricPolicyVersion: 'backtest-summary-v1',
+        metricPolicyVersion: BACKTEST_METRIC_POLICY.version,
         eventOrderingPolicyVersion:
           input.executionPlan.eventOrderingPolicyVersion,
         roundingPolicyVersion: input.executionPlan.roundingPolicyVersion,
@@ -404,8 +406,31 @@ export class PostgresBacktestApiStore
       .limit(1);
     const row = rows[0];
     if (!row) return null;
+    const persistedMethodology = row.summary.methodology as {
+      readonly metricPolicy?: Record<string, unknown>;
+      readonly metrics?: Record<string, unknown>;
+      readonly engineVersion?: string;
+      readonly resultHash?: string;
+    };
+    const metrics = persistedMethodology.metrics ?? {};
     return {
       ...row.summary,
+      annualizedVolatility: row.summary.volatility,
+      sharpe: row.summary.sharpeRatio,
+      sortino: row.summary.sortinoRatio,
+      calmar: row.summary.calmarRatio,
+      excessReturn:
+        (
+          metrics['excessReturn'] as
+            | { readonly value?: string | null }
+            | undefined
+        )?.value ?? null,
+      metrics,
+      methodology: {
+        engineVersion: persistedMethodology.engineVersion,
+        resultHash: persistedMethodology.resultHash,
+        metricPolicy: persistedMethodology.metricPolicy,
+      },
       dataSnapshot: {
         id: row.snapshot.id,
         hash: row.snapshot.snapshotHash,
@@ -522,8 +547,40 @@ export class PostgresBacktestApiStore
 }
 
 @Injectable()
+export class BullMqExperimentApiDispatcher implements OnApplicationShutdown {
+  private queue: Queue<ExperimentQueuePayload> | undefined;
+  constructor(private readonly config: ConfigService) {}
+  async dispatch(input: ExperimentQueuePayload) {
+    const queue = this.queue ?? this.createQueue();
+    this.queue = queue;
+    const digest = createHash('sha256')
+      .update(input.experimentId)
+      .digest('hex')
+      .slice(0, 32);
+    await queue.add(ATLAS_JOB_NAMES.backtestExperiment, input, {
+      jobId: `backtest-experiment-${digest}`,
+      attempts: 5,
+      backoff: { type: 'exponential', delay: 1_000 },
+      removeOnComplete: 100,
+      removeOnFail: false,
+    });
+  }
+  async onApplicationShutdown() {
+    await this.queue?.close();
+  }
+  private createQueue() {
+    return new Queue<ExperimentQueuePayload>(ATLAS_QUEUE_NAMES.experiments, {
+      connection: { url: this.config.getOrThrow<string>('REDIS_URL') },
+    });
+  }
+}
+
+@Injectable()
 export class PostgresExperimentStore implements ExperimentStore {
-  constructor(private readonly connection: ApiDatabase) {}
+  constructor(
+    private readonly connection: ApiDatabase,
+    private readonly dispatcher: BullMqExperimentApiDispatcher,
+  ) {}
   async listOwned(userId: string) {
     const rows = await this.connection.database
       .select()
@@ -541,17 +598,38 @@ export class PostgresExperimentStore implements ExperimentStore {
     return rows[0] ? mapExperiment(rows[0]) : null;
   }
   async create(input: Parameters<ExperimentStore['create']>[0]) {
+    const snapshots = await this.connection.database
+      .select({ hash: backtestDataSnapshots.snapshotHash })
+      .from(backtestDataSnapshots)
+      .where(eq(backtestDataSnapshots.id, input.dataSnapshotId))
+      .limit(1);
+    if (snapshots[0]?.hash !== input.dataSnapshotHash)
+      throw new Error('EXPERIMENT_SNAPSHOT_MISMATCH');
     const rows = await this.connection.database
       .insert(researchExperiments)
       .values({
-        ...input,
-        status: 'queued',
+        id: input.id,
+        ownerUserId: input.ownerUserId,
+        strategyId: input.strategyId,
+        strategyRevision: input.strategyRevision,
         dataSnapshotId: input.dataSnapshotId,
+        name: input.name,
+        experimentHash: input.experimentHash,
+        definition: input.definition,
+        combinationCount: input.combinationCount,
+        status: 'queued',
         createdAt: input.now,
         updatedAt: input.now,
       })
       .returning();
-    return mapExperiment(rows[0]!);
+    const experiment = mapExperiment(rows[0]!);
+    try {
+      await this.dispatcher.dispatch({ experimentId: experiment.id });
+    } catch {
+      // PostgreSQL remains authoritative. The production worker reconciler
+      // dispatches queued experiments after transient Redis failures.
+    }
+    return experiment;
   }
   async cancel(id: string, userId: string, now: Date) {
     return this.connection.database.transaction(async (transaction) => {

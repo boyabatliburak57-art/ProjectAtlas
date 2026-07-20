@@ -1,41 +1,49 @@
-# v0.8.1 Remediation Delta Entegrasyon Talimatı
+# v0.9 Production Readiness Delta Entegrasyonu
 
 ## Kopyalama
 
 ```bash
 cd ~/Documents/project-atlas
-cp -R ~/Downloads/project-atlas-blueprint-v0.8.1-strategy-lab-remediation-delta/. .
+cp -R ~/Downloads/project-atlas-blueprint-v0.9-production-readiness-delta/. .
 ```
 
-README, ATLAS_INDEX ve CHANGELOG'a mevcut içeriği silmeden şu bölümü ekle:
-
-```markdown
-## v0.8.1 Strategy Lab Remediation
-
-TASK-070 NO-GO bulguları:
-
-- PERF-BT-001–006 benchmark runner eksik
-- mandatory metrics ve turnover eksik
-- experiment production worker wiring eksik
-- full Playwright suite kararsız
-
-Görev sırası: TASK-070A → TASK-070E.
-
-TASK-070E GO olmadan sonraki pakete geçilmez.
-```
-
-T3 entegrasyon promptu:
+## T3 Code entegrasyon promptu
 
 ```text
-v0.8.1 remediation belgelerini repository'ye entegre et.
-README, ATLAS_INDEX ve CHANGELOG mevcut içeriğini silme.
-Yeni ADR oluşturma.
-Threshold/fixture değiştirme.
-Playwright skip/fixme ekleme.
+INTEGRATION_INSTRUCTIONS.md ve v0.9 belgelerini oku.
 
-pnpm format:check
-pnpm validate:adr
-git diff --check
+Mevcut README.md, ATLAS_INDEX.md ve CHANGELOG.md içeriklerini silmeden v0.9 Production Readiness, Security Hardening and Operations bölümünü ekle.
+
+Sabit ADR numarası üretme.
+TASK-072 sırasında repository'deki sonraki boş ADR kimliklerini kullan.
+Mevcut milestone threshold ve baseline'larını değiştirme.
+Gerçek production deploy başlatma; yalnız kullanıcı onaylı workflow/manifests oluştur.
+
+Sonunda:
+- pnpm format:check
+- pnpm validate:adr
+- git diff --check
 
 çalıştır.
+```
+
+## ATLAS_INDEX önerisi
+
+```markdown
+## v0.9 Production Readiness, Security Hardening and Operations
+
+Belgeler:
+
+- DOC-036–DOC-040
+- ARCH-016–ARCH-018
+- Production Readiness Decision Proposal
+- DB-009
+- API-009
+- Production Security Test Matrix
+- Load/Chaos/Resilience Baseline
+- Production Release Runbook
+
+Görev sırası: TASK-071 → TASK-080.
+
+TASK-080 GO olmadan v1.0 release candidate oluşturulmaz.
 ```

@@ -273,6 +273,35 @@ describe('OpenAPI document', () => {
     expect(document.paths['/api/v1/backtests/{id}']?.get).toBeDefined();
     expect(document.paths['/api/v1/backtests/{id}/cancel']?.post).toBeDefined();
     expect(document.paths['/api/v1/backtests/{id}/summary']?.get).toBeDefined();
+    const backtestSummarySchema = JSON.stringify(
+      document.components?.schemas?.BacktestSummaryDto,
+    );
+    const backtestMetricSchema = JSON.stringify(
+      document.components?.schemas?.BacktestMetricDto,
+    );
+    for (const field of [
+      'annualizedReturn',
+      'annualizedVolatility',
+      'sharpe',
+      'sortino',
+      'calmar',
+      'expectancy',
+      'turnover',
+      'benchmarkReturn',
+      'excessReturn',
+      'metrics',
+      'methodology',
+    ])
+      expect(backtestSummarySchema).toContain(field);
+    for (const field of [
+      'value',
+      'status',
+      'reasonCode',
+      'observationCount',
+      'methodologyVersion',
+      'warnings',
+    ])
+      expect(backtestMetricSchema).toContain(field);
     expect(document.paths['/api/v1/backtests/{id}/series']?.get).toBeDefined();
     expect(document.paths['/api/v1/backtests/{id}/trades']?.get).toBeDefined();
     expect(document.paths['/api/v1/backtests/{id}/orders']?.get).toBeDefined();

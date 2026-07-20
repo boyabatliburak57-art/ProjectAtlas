@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createAlertEvaluationJobId,
   createBacktestRunJobId,
+  createExperimentJobId,
   createHeartbeatJobId,
   createNotificationDeliveryJobId,
   createMarketIntelligenceReconciliationJobId,
@@ -47,6 +48,16 @@ describe('queue contracts', () => {
     );
     expect(createBacktestRunJobId('run-1')).not.toBe(
       createBacktestRunJobId('run-2'),
+    );
+  });
+
+  it('creates stable experiment identities with an isolated production queue', () => {
+    expect(QUEUE_NAMES.experiments).toMatch(/^atlas\.experiments\.v\d+$/);
+    expect(createExperimentJobId('experiment-1')).toBe(
+      createExperimentJobId('experiment-1'),
+    );
+    expect(createExperimentJobId('experiment-1')).not.toBe(
+      createExperimentJobId('experiment-2'),
     );
   });
 

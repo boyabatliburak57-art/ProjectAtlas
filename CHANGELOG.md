@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.8.1-strategy-lab-remediation — 2026-07-19
+
+### Eklendi
+
+- DOC-035 Backtest Metrics and Benchmark Quality Gates
+- Backtest Benchmark Runner Specification
+- Strategy Lab E2E Stability Guide
+- Strategy Lab v0.8.1 remediation planı
+- TASK-070A Backtest Metrics Remediation
+- TASK-070B Experiment Production Worker Wiring
+- TASK-070C Backtest Performance Benchmark Runner
+- TASK-070D Strategy Lab E2E Stability
+- TASK-070E Strategy Lab Milestone Re-Audit
+
+### Değişti
+
+- TASK-070 NO-GO bulguları ve zorunlu TASK-070A → TASK-070E uygulama sırası README ve ATLAS_INDEX'e eklendi.
+- Mandatory metrics, gerçek turnover, production experiment worker, PERF-BT-001–006 ve full Playwright stability yeniden GO kapısına bağlandı.
+
+### Değişmedi
+
+- Yeni ADR oluşturulmadı; mevcut ADR dosyaları ve kimlikleri değiştirilmedi.
+- Mevcut benchmark threshold'ları ve fixture kapsamları değiştirilmedi.
+- Playwright testlerine skip, fixme veya only eklenmedi.
+
 ## 0.8.0-strategy-lab — 2026-07-18
 
 ### Eklendi
