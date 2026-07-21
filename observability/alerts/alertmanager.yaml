@@ -1,0 +1,17 @@
+route:
+  receiver: atlas-platform-oncall
+  group_by: [alertname, environment, atlas_group]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="critical"]
+      repeat_interval: 30m
+      receiver: atlas-critical-oncall
+receivers:
+  - name: atlas-platform-oncall
+  - name: atlas-critical-oncall
+inhibit_rules:
+  - source_matchers: [severity="critical"]
+    target_matchers: [severity="warning"]
+    equal: [alertname, environment, atlas_group]

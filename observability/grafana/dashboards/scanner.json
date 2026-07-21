@@ -1,0 +1,48 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scanner terminal rate",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(atlas_scanner_terminal_total[5m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Completion p95",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(atlas_scanner_completion_duration_ms_bucket[5m])))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "notEvaluable and cancellation",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (operation) (rate(atlas_not_evaluable_total{operation=\"scanner\"}[5m]))",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(atlas_cancellation_latency_ms_bucket{operation=\"scanner\"}[5m])))",
+          "refId": "B"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["atlas", "scanner"],
+  "templating": { "list": [] },
+  "title": "Atlas — Scanner",
+  "uid": "atlas-scanner"
+}

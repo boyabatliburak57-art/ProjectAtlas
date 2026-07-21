@@ -45,6 +45,8 @@ const environmentSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
     .default('development'),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.url().optional(),
+  OTEL_TRACE_SAMPLE_RATIO: z.coerce.number().min(0).max(1).default(0.1),
   OBJECT_STORAGE_ACCESS_KEY_ID: z.string().min(1).optional(),
   OBJECT_STORAGE_BUCKET: z.string().min(1).optional(),
   OBJECT_STORAGE_ENDPOINT: z.url().optional(),
@@ -52,6 +54,7 @@ const environmentSchema = z.object({
   REDIS_URL: redisUrlSchema,
   RELEASE_COMMIT_SHA: z.string().min(7).max(64).default('development'),
   RELEASE_VERSION: z.string().min(1).max(128).default('development'),
+  TELEMETRY_POLICY_VERSION: z.literal('telemetry-v1').default('telemetry-v1'),
   WORKER_DEBUG: booleanEnvironmentSchema,
   WORKER_HEALTH_FILE: z.string().default(''),
   WORKER_ROLE: z.enum(workerRoles).default('all'),
@@ -100,12 +103,15 @@ type DeploymentEnvironmentKeys =
   | 'ATLAS_ENV'
   | 'CONFIG_SCHEMA_VERSION'
   | 'NODE_ENV'
+  | 'OTEL_EXPORTER_OTLP_ENDPOINT'
+  | 'OTEL_TRACE_SAMPLE_RATIO'
   | 'OBJECT_STORAGE_ACCESS_KEY_ID'
   | 'OBJECT_STORAGE_BUCKET'
   | 'OBJECT_STORAGE_ENDPOINT'
   | 'OBJECT_STORAGE_SECRET_ACCESS_KEY'
   | 'RELEASE_COMMIT_SHA'
   | 'RELEASE_VERSION'
+  | 'TELEMETRY_POLICY_VERSION'
   | 'WORKER_DEBUG'
   | 'WORKER_HEALTH_FILE'
   | 'WORKER_ROLE';
@@ -142,6 +148,7 @@ export function parseEnvironment(
       'REDIS_URL',
       'RELEASE_COMMIT_SHA',
       'RELEASE_VERSION',
+      'TELEMETRY_POLICY_VERSION',
       'WORKER_HEALTH_FILE',
     ] as const;
     const missingFields = requiredFields.filter(

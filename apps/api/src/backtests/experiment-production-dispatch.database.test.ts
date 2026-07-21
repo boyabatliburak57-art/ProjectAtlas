@@ -22,6 +22,7 @@ import {
   AUTHENTICATED_USER_RESOLVER,
   type AuthenticatedUserResolver,
 } from '../common/auth/authenticated-user';
+import { ApiDatabase } from '../scanner/scanner-runtime.infrastructure';
 
 const ownerUserId = '00000000-0000-4000-8000-000000000711';
 const strategyId = '00000000-0000-4000-8000-000000000712';
@@ -74,6 +75,8 @@ describe('experiment production API dispatch', () => {
     });
     const auth: AuthenticatedUserResolver = () => ownerUserId;
     const module = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(ApiDatabase)
+      .useValue({ database: db })
       .overrideProvider(AUTHENTICATED_USER_RESOLVER)
       .useValue(auth)
       .compile();
@@ -86,7 +89,7 @@ describe('experiment production API dispatch', () => {
     await Promise.allSettled([application?.close(), queue.close(), pool.end()]);
   });
 
-  it('creates through HTTP and dispatches the minimal production payload', async () => {
+  it('creates through HTTP and dispatches only the identifier and safe trace context', async () => {
     const server = application.getHttpServer() as Server;
     const response = await request(server)
       .post('/api/v1/experiments')
@@ -118,8 +121,8 @@ describe('experiment production API dispatch', () => {
             maximumCombinations: 10,
           },
         },
-      })
-      .expect(201);
+      });
+    expect(response.status, JSON.stringify(response.body)).toBe(201);
     const body: unknown = response.body;
     if (!isRecord(body) || !isRecord(body['data']))
       throw new Error('EXPERIMENT_RESPONSE_INVALID');
@@ -129,7 +132,15 @@ describe('experiment production API dispatch', () => {
     const jobs = await queue.getJobs(['waiting', 'active', 'delayed']);
     const job = jobs.find((item) => item.data.experimentId === experimentId);
     expect(job?.name).toBe('backtests.experiment.v1');
-    expect(job?.data).toEqual({ experimentId });
+    expect(job?.data).toMatchObject({ experimentId });
+    expect(typeof job?.data.telemetry?.correlationId).toBe('string');
+    expect(job?.data.telemetry?.traceparent).toMatch(
+      /^00-[0-9a-f]{32}-[0-9a-f]{16}-0[01]$/,
+    );
+    expect(Object.keys(job?.data ?? {}).sort()).toEqual([
+      'experimentId',
+      'telemetry',
+    ]);
   });
 });
 

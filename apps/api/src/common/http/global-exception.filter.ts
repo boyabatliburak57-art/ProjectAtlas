@@ -3,12 +3,13 @@ import {
   Catch,
   HttpException,
   HttpStatus,
-  Logger,
+  Optional,
   type ExceptionFilter,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
 import { getCorrelationId, getRequestId } from './request-context';
+import { TelemetryService } from '../../observability/telemetry.service';
 
 interface ErrorDetails {
   readonly code?: string;
@@ -22,7 +23,7 @@ function isErrorDetails(value: unknown): value is ErrorDetails {
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(GlobalExceptionFilter.name);
+  constructor(@Optional() private readonly telemetry?: TelemetryService) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const context = host.switchToHttp();
@@ -43,17 +44,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     );
 
     if (isUnexpected) {
-      this.logger.error({
+      this.telemetry?.log('error', 'http.request.failed', {
         correlationId: getCorrelationId(request),
-        errorCode: details?.code ?? `HTTP_${status}`,
-        errorType:
+        errorCategory:
           exception instanceof Error
             ? exception.constructor.name
             : 'UnknownError',
-        module: 'http',
-        operation: request.originalUrl,
+        outcome: 'error',
         requestId: getRequestId(request),
-        service: 'atlas-api',
+        statusCode: status,
       });
     }
 

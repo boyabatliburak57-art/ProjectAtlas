@@ -1,3 +1,5 @@
+import type { SafeTraceContext } from './observability';
+
 export const ATLAS_QUEUE_NAMES = {
   alerts: 'atlas.alerts.v1',
   backtests: 'atlas.backtests.v1',
@@ -51,26 +53,31 @@ export interface MarketIntelligenceReconciliationQueuePayload {
   readonly staleAfterMs: number;
   readonly invalidations: readonly MarketIntelligenceInvalidationPayload[];
   readonly correlationId?: string;
+  readonly telemetry?: SafeTraceContext;
 }
 
 export interface FundamentalsIngestionQueuePayload {
   readonly providerCode: string;
   readonly providerSymbol: string;
   readonly correlationId?: string;
+  readonly telemetry?: SafeTraceContext;
 }
 
 export interface ScannerRunQueuePayload {
   readonly runId: string;
   readonly correlationId: string;
+  readonly telemetry?: SafeTraceContext;
 }
 
 export interface BacktestRunQueuePayload {
   readonly runId: string;
   readonly correlationId: string;
+  readonly telemetry?: SafeTraceContext;
 }
 
 export interface ExperimentQueuePayload {
   readonly experimentId: string;
+  readonly telemetry?: SafeTraceContext;
 }
 
 export interface MarketDataAlertEvent {
@@ -81,6 +88,7 @@ export interface MarketDataAlertEvent {
   readonly barOpenTime: string;
   readonly dataCutoffAt: string;
   readonly isClosed: boolean;
+  readonly telemetry?: SafeTraceContext;
 }
 
 export interface ScanCompletedAlertEvent {
@@ -88,6 +96,7 @@ export interface ScanCompletedAlertEvent {
   readonly eventId: string;
   readonly scanRunId: string;
   readonly dataCutoffAt: string;
+  readonly telemetry?: SafeTraceContext;
 }
 
 export type AlertEvaluationQueuePayload =
@@ -97,4 +106,7 @@ export type AlertEvaluationQueuePayload =
 export interface NotificationDeliveryQueuePayload {
   readonly outboxId: number;
   readonly attempt: number;
+  readonly telemetry?: SafeTraceContext;
 }
+
+export * from './observability';

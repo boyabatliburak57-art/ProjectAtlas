@@ -1,0 +1,45 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Queue lag",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "max by (queue) (atlas_queue_lag_ms)", "refId": "A" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Retries and stalled jobs",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (queue) (rate(atlas_queue_retry_total[5m]))",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (queue) (increase(atlas_queue_stalled_total[5m]))",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Worker duration p95",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, job_type) (rate(atlas_worker_duration_ms_bucket[5m])))",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["atlas", "workers"],
+  "templating": { "list": [] },
+  "title": "Atlas — Queue and Workers",
+  "uid": "atlas-workers"
+}

@@ -1,0 +1,16 @@
+{
+  "windowStartedAt": "2026-06-21T00:00:00.000Z",
+  "windowEndedAt": "2026-07-21T00:00:00.000Z",
+  "apiEligibleRequests": 1000000,
+  "apiSuccessfulRequests": 999500,
+  "workerEligibleJobs": 10000,
+  "workerSuccessfulTerminalJobs": 9970,
+  "journeys": {
+    "scanner_completion": 0.998,
+    "alert_delivery": 0.999,
+    "portfolio_recalculation": 0.999,
+    "backtest_completion": 0.997,
+    "market_data_freshness": 0.999
+  },
+  "activeFastBurnAlerts": 0
+}

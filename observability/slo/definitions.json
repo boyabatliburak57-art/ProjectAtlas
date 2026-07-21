@@ -1,0 +1,39 @@
+{
+  "policyVersion": "slo-v1",
+  "windowDays": 30,
+  "availability": {
+    "target": 0.999,
+    "eligible": "non-maintenance HTTP requests excluding client-caused 4xx",
+    "budgetFraction": 0.001
+  },
+  "workerTerminalRate": {
+    "target": 0.995,
+    "eligible": "durable jobs excluding validation failures and user cancellation"
+  },
+  "latencyClasses": {
+    "read": "preserve endpoint milestone p95",
+    "write": "preserve endpoint milestone p95",
+    "heavyJobCreate": "preserve endpoint milestone p95",
+    "resultPagination": "preserve endpoint milestone p95"
+  },
+  "journeys": [
+    "queue_lag",
+    "market_data_freshness",
+    "scanner_completion",
+    "alert_delivery",
+    "portfolio_recalculation",
+    "backtest_completion"
+  ],
+  "burnRateWindows": [
+    { "short": "5m", "long": "1h", "critical": 14.4 },
+    { "short": "30m", "long": "6h", "warning": 6 },
+    { "short": "2h", "long": "1d", "warning": 3 }
+  ],
+  "preservedPerformanceContracts": [
+    "performance/thresholds/scanner-runtime.json",
+    "performance/thresholds/alerts-watchlists.json",
+    "performance/thresholds/portfolio-risk.json",
+    "performance/thresholds/market-intelligence.json",
+    "performance/thresholds/backtest.json"
+  ]
+}

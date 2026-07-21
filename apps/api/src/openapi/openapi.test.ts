@@ -29,6 +29,15 @@ describe('OpenAPI document', () => {
     expect(document.info.version).toBe('1.0');
     expect(document.paths['/health/live']?.get).toBeDefined();
     expect(document.paths['/health/ready']?.get).toBeDefined();
+    expect(document.paths['/api/v1/auth/login']?.post).toBeDefined();
+    expect(document.paths['/api/v1/auth/refresh']?.post).toBeDefined();
+    expect(document.paths['/api/v1/auth/logout']?.post).toBeDefined();
+    expect(
+      document.paths['/api/v1/auth/password-reset/request']?.post,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/auth/password-reset/confirm']?.post,
+    ).toBeDefined();
     expect(document.paths['/api/v1/indicators']?.get).toBeDefined();
     expect(document.paths['/api/v1/indicators/{code}']?.get).toBeDefined();
     expect(document.paths['/api/v1/scanner/runs']?.post).toBeDefined();
@@ -323,6 +332,35 @@ describe('OpenAPI document', () => {
     ).toBeDefined();
     expect(
       document.paths['/api/v1/experiments/{id}/export']?.post,
+    ).toBeDefined();
+    expect(document.paths['/api/v1/admin/incidents']?.get).toBeDefined();
+    expect(document.paths['/api/v1/admin/incidents']?.post).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/operations/feature-flags']?.get,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/operations/feature-flags']?.post,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/operations/feature-flags/{id}/versions']
+        ?.post,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/operations/releases']?.get,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/operations/releases']?.post,
+    ).toBeDefined();
+    expect(document.paths['/api/v1/admin/operations/audit']?.get).toBeDefined();
+    expect(document.paths['/api/v1/admin/incidents/{id}']?.get).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/incidents/{id}/acknowledge']?.post,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/incidents/{id}/timeline']?.post,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/incidents/{id}/resolve']?.post,
     ).toBeDefined();
     expect(
       JSON.stringify(document.paths['/api/v1/backtests']?.post?.parameters),

@@ -41,6 +41,7 @@ import { ConfigService } from '@nestjs/config';
 import { and, asc, desc, eq, gt, inArray, lt, or, sql } from 'drizzle-orm';
 import { Queue } from 'bullmq';
 
+import { TelemetryService } from '../observability/telemetry.service';
 import { ApiDatabase } from '../scanner/scanner-runtime.infrastructure';
 import type {
   BacktestAnalyticsStore,
@@ -549,7 +550,10 @@ export class PostgresBacktestApiStore
 @Injectable()
 export class BullMqExperimentApiDispatcher implements OnApplicationShutdown {
   private queue: Queue<ExperimentQueuePayload> | undefined;
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly telemetry: TelemetryService,
+  ) {}
   async dispatch(input: ExperimentQueuePayload) {
     const queue = this.queue ?? this.createQueue();
     this.queue = queue;
@@ -557,13 +561,26 @@ export class BullMqExperimentApiDispatcher implements OnApplicationShutdown {
       .update(input.experimentId)
       .digest('hex')
       .slice(0, 32);
-    await queue.add(ATLAS_JOB_NAMES.backtestExperiment, input, {
-      jobId: `backtest-experiment-${digest}`,
-      attempts: 5,
-      backoff: { type: 'exponential', delay: 1_000 },
-      removeOnComplete: 100,
-      removeOnFail: false,
-    });
+    const traceContext = this.telemetry.safeQueueContext();
+    await this.telemetry.span(
+      'queue.enqueue.experiment',
+      { messagingSystem: 'redis', queue: ATLAS_QUEUE_NAMES.experiments },
+      () =>
+        queue.add(
+          ATLAS_JOB_NAMES.backtestExperiment,
+          {
+            ...input,
+            ...(traceContext === undefined ? {} : { telemetry: traceContext }),
+          },
+          {
+            jobId: `backtest-experiment-${digest}`,
+            attempts: 5,
+            backoff: { type: 'exponential', delay: 1_000 },
+            removeOnComplete: 100,
+            removeOnFail: false,
+          },
+        ),
+    );
   }
   async onApplicationShutdown() {
     await this.queue?.close();
@@ -727,7 +744,10 @@ export class InMemoryBacktestCommandGuard implements BacktestCommandGuard {
 @Injectable()
 export class BullMqBacktestApiDispatcher implements OnApplicationShutdown {
   private queue: Queue<BacktestRunQueuePayload> | undefined;
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly telemetry: TelemetryService,
+  ) {}
   async dispatch(input: BacktestRunQueuePayload) {
     const queue = this.queue ?? this.createQueue();
     this.queue = queue;
@@ -735,11 +755,24 @@ export class BullMqBacktestApiDispatcher implements OnApplicationShutdown {
       .update(input.runId)
       .digest('hex')
       .slice(0, 32);
-    await queue.add(ATLAS_JOB_NAMES.backtestRun, input, {
-      jobId: `backtest-run-${digest}`,
-      attempts: 5,
-      backoff: { type: 'exponential', delay: 1_000 },
-    });
+    const traceContext = this.telemetry.safeQueueContext();
+    await this.telemetry.span(
+      'queue.enqueue.backtest',
+      { messagingSystem: 'redis', queue: ATLAS_QUEUE_NAMES.backtests },
+      () =>
+        queue.add(
+          ATLAS_JOB_NAMES.backtestRun,
+          {
+            ...input,
+            ...(traceContext === undefined ? {} : { telemetry: traceContext }),
+          },
+          {
+            jobId: `backtest-run-${digest}`,
+            attempts: 5,
+            backoff: { type: 'exponential', delay: 1_000 },
+          },
+        ),
+    );
   }
   async onApplicationShutdown() {
     await this.queue?.close();

@@ -1,0 +1,33 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Market-data freshness",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "max by (environment) (atlas_market_data_freshness_seconds)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Stale and partial responses",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(atlas_market_response_total{outcome=~\"stale|partial\"}[5m]))",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["atlas", "market-data"],
+  "templating": { "list": [] },
+  "title": "Atlas — Market Data Freshness",
+  "uid": "atlas-market-data"
+}

@@ -14,10 +14,69 @@ const booleanEnvironmentSchema = z
   ])
   .default(false);
 
+const corsOriginAllowlistSchema = z.string().refine((value) => {
+  const origins = value.split(',');
+  if (origins.length === 0 || origins.some((origin) => origin === '*'))
+    return false;
+  return origins.every((origin) => {
+    try {
+      const url = new URL(origin);
+      return (
+        url.origin === origin && ['http:', 'https:'].includes(url.protocol)
+      );
+    } catch {
+      return false;
+    }
+  });
+}, 'API_CORS_ORIGIN must be an explicit comma-separated origin allowlist');
+
 const environmentSchema = z.object({
   ATLAS_ENV: atlasEnvironmentSchema,
   CONFIG_SCHEMA_VERSION: z.literal('1').default('1'),
-  API_CORS_ORIGIN: z.url().default('http://localhost:3000'),
+  API_CORS_ORIGIN: corsOriginAllowlistSchema.default('http://localhost:3000'),
+  AUTH_COOKIE_NAME: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,64}$/u)
+    .default('atlas_session'),
+  AUTH_CSRF_COOKIE_NAME: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,64}$/u)
+    .default('atlas_csrf'),
+  AUTH_IDLE_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(300)
+    .max(86_400)
+    .default(3_600),
+  AUTH_MAX_CONCURRENT_SESSIONS: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(20)
+    .default(5),
+  AUTH_PASSWORD_RESET_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(300)
+    .max(3_600)
+    .default(900),
+  AUTH_REAUTH_MAX_AGE_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(60)
+    .max(3_600)
+    .default(900),
+  AUTH_SESSION_HMAC_KEY: z
+    .string()
+    .min(32)
+    .max(512)
+    .default('local-only-auth-hmac-key-32-bytes'),
+  AUTH_SESSION_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(900)
+    .max(2_592_000)
+    .default(86_400),
   API_DEBUG: booleanEnvironmentSchema,
   API_HOST: z.string().min(1).default('0.0.0.0'),
   API_PORT: z.coerce.number().int().min(1).max(65_535).default(3001),
@@ -31,6 +90,8 @@ const environmentSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
     .default('development'),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.url().optional(),
+  OTEL_TRACE_SAMPLE_RATIO: z.coerce.number().min(0).max(1).default(0.1),
   OBJECT_STORAGE_ACCESS_KEY_ID: z.string().min(1).optional(),
   OBJECT_STORAGE_BUCKET: z.string().min(1).optional(),
   OBJECT_STORAGE_ENDPOINT: z.url().optional(),
@@ -38,6 +99,7 @@ const environmentSchema = z.object({
   HEALTH_CHECK_DATABASE: booleanEnvironmentSchema,
   RELEASE_COMMIT_SHA: z.string().min(7).max(64).default('development'),
   RELEASE_VERSION: z.string().min(1).max(128).default('development'),
+  TELEMETRY_POLICY_VERSION: z.literal('telemetry-v1').default('telemetry-v1'),
   REDIS_URL: z
     .url()
     .refine((value) => ['redis:', 'rediss:'].includes(new URL(value).protocol))
@@ -54,6 +116,7 @@ const environmentSchema = z.object({
     .min(1_000)
     .max(300_000)
     .default(15_000),
+  SECURITY_RATE_LIMIT_ENABLED: booleanEnvironmentSchema,
   WATCHLIST_MARKET_DATA_STALE_AFTER_MS: z.coerce
     .number()
     .int()
@@ -90,6 +153,7 @@ const environmentSchema = z.object({
     .min(100)
     .max(300_000)
     .default(5_000),
+  METRICS_BEARER_TOKEN: z.string().min(32).max(512).optional(),
 });
 
 export type Environment = z.infer<typeof environmentSchema>;
@@ -111,7 +175,9 @@ export function parseEnvironment(
   if (atlasEnvironment === 'staging' || atlasEnvironment === 'production') {
     const requiredFields = [
       'API_CORS_ORIGIN',
+      'AUTH_SESSION_HMAC_KEY',
       'DATABASE_URL',
+      'METRICS_BEARER_TOKEN',
       'OBJECT_STORAGE_ACCESS_KEY_ID',
       'OBJECT_STORAGE_BUCKET',
       'OBJECT_STORAGE_ENDPOINT',
@@ -119,6 +185,7 @@ export function parseEnvironment(
       'REDIS_URL',
       'RELEASE_COMMIT_SHA',
       'RELEASE_VERSION',
+      'TELEMETRY_POLICY_VERSION',
     ] as const;
     const missingFields = requiredFields.filter(
       (field) =>
@@ -133,9 +200,17 @@ export function parseEnvironment(
     if (result.data.API_DEBUG) {
       throw new Error('Invalid environment configuration: API_DEBUG');
     }
+    if (result.data.API_CORS_ORIGIN.split(',').includes('*')) {
+      throw new Error('Invalid environment configuration: API_CORS_ORIGIN');
+    }
     if (!result.data.HEALTH_CHECK_DATABASE) {
       throw new Error(
         'Invalid environment configuration: HEALTH_CHECK_DATABASE',
+      );
+    }
+    if (!result.data.SECURITY_RATE_LIMIT_ENABLED) {
+      throw new Error(
+        'Invalid environment configuration: SECURITY_RATE_LIMIT_ENABLED',
       );
     }
   }

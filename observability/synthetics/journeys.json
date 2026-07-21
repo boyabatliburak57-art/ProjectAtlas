@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "environment": "staging",
+  "user": "dedicated non-privileged synthetic identity supplied by secret manager",
+  "checks": [
+    { "code": "health-live", "method": "GET", "path": "/health/live" },
+    { "code": "health-startup", "method": "GET", "path": "/health/startup" },
+    { "code": "health-ready", "method": "GET", "path": "/health/ready" },
+    { "code": "login-session", "method": "GET", "path": "/api/v1/portfolios" },
+    {
+      "code": "market-overview",
+      "method": "GET",
+      "path": "/api/v1/market/overview"
+    },
+    {
+      "code": "scanner-create-result",
+      "method": "POST",
+      "path": "/api/v1/scanner/runs"
+    },
+    {
+      "code": "portfolio-valuation",
+      "method": "GET",
+      "pathTemplate": "/api/v1/portfolios/{portfolioId}/valuation"
+    },
+    {
+      "code": "backtest-create-status",
+      "method": "POST",
+      "path": "/api/v1/backtests"
+    }
+  ],
+  "safety": {
+    "credentials": "environment/secret manager only",
+    "idempotency": "unique per invocation",
+    "cleanup": "synthetic resources are tagged and removed by the staging retention job",
+    "productionWrites": false
+  }
+}

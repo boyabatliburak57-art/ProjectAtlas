@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: Project Atlas
+    orgId: 1
+    folder: Project Atlas
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/atlas-dashboards

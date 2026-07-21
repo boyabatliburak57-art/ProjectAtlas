@@ -25,6 +25,21 @@ import { GlobalExceptionFilter } from './common/http/global-exception.filter';
 import { parseEnvironment } from './config/environment';
 import { HealthController } from './health/health.controller';
 import { HealthService } from './health/health.service';
+import { TelemetryService } from './observability/telemetry.service';
+import { MetricsController } from './observability/metrics.controller';
+import { IncidentsController } from './operations/incidents.controller';
+import { IncidentRepository } from './operations/incidents.repository';
+import { IncidentsService } from './operations/incidents.service';
+import { OperationalControlsController } from './operations/operational-controls.controller';
+import { OperationalControlsService } from './operations/operational-controls.service';
+import { AuthController } from './security/auth.controller';
+import { AuthSessionService } from './security/auth-session.service';
+import { AuthenticationMiddleware } from './security/authentication.middleware';
+import { AbusePreventionMiddleware } from './security/abuse-prevention.middleware';
+import {
+  requestSecurityPrincipal,
+  SECURITY_PRINCIPAL_RESOLVER,
+} from './security/security-principal';
 import { IndicatorCatalogController } from './indicators/indicator-catalog.controller';
 import {
   NotificationPreferencesController,
@@ -155,6 +170,7 @@ import {
 @Module({
   controllers: [
     HealthController,
+    AuthController,
     IndicatorCatalogController,
     ScannerRuntimeController,
     ScannerCatalogController,
@@ -173,6 +189,9 @@ import {
     StrategiesController,
     BacktestsController,
     ExperimentsController,
+    IncidentsController,
+    OperationalControlsController,
+    MetricsController,
   ],
   imports: [
     ConfigModule.forRoot({
@@ -184,10 +203,19 @@ import {
   providers: [
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
     HealthService,
+    TelemetryService,
+    AuthSessionService,
+    AuthenticationMiddleware,
+    AbusePreventionMiddleware,
+    IncidentRepository,
     { provide: INDICATOR_REGISTRY, useFactory: createCoreIndicatorRegistry },
     {
       provide: AUTHENTICATED_USER_RESOLVER,
       useValue: trustedRequestUserResolver,
+    },
+    {
+      provide: SECURITY_PRINCIPAL_RESOLVER,
+      useValue: requestSecurityPrincipal,
     },
     ApiDatabase,
     PostgresScannerRuntimeReader,
@@ -354,12 +382,18 @@ import {
     StrategiesService,
     BacktestsService,
     ExperimentsService,
+    IncidentsService,
+    OperationalControlsService,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     consumer
-      .apply(CorrelationIdMiddleware)
+      .apply(
+        CorrelationIdMiddleware,
+        AuthenticationMiddleware,
+        AbusePreventionMiddleware,
+      )
       .forRoutes({ method: RequestMethod.ALL, path: '{*path}' });
   }
 }

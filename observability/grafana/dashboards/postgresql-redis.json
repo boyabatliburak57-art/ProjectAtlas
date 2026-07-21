@@ -1,0 +1,35 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "PostgreSQL pool",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum by (service) (atlas_db_pool_active)", "refId": "A" },
+        { "expr": "sum by (service) (atlas_db_pool_waiting)", "refId": "B" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "DB and Redis latency",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, operation) (rate(atlas_db_operation_duration_ms_bucket[5m])))",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, operation) (rate(atlas_redis_operation_duration_ms_bucket[5m])))",
+          "refId": "B"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["atlas", "database"],
+  "templating": { "list": [] },
+  "title": "Atlas — PostgreSQL and Redis",
+  "uid": "atlas-data-services"
+}

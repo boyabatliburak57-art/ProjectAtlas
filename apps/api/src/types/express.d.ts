@@ -3,7 +3,13 @@ declare global {
     interface Request {
       correlationId?: string;
       authenticatedUserId?: string;
+      authenticatedSessionId?: string;
+      authenticatedRoles?: readonly string[];
+      authenticationAt?: Date;
+      authenticationMethod?: 'bearer' | 'cookie';
       requestId?: string;
+      traceId?: string;
+      traceparent?: string;
     }
   }
 }

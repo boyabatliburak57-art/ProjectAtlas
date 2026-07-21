@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
 import { createDatabase, type Database } from '@atlas/database';
-import type { NotificationDeliveryQueuePayload } from '@atlas/types';
+import type {
+  NotificationDeliveryQueuePayload,
+  SafeTraceContext,
+} from '@atlas/types';
 import { type Job, type Queue, UnrecoverableError } from 'bullmq';
 
 import type { WorkerEnvironment } from '../config/environment';
@@ -24,7 +27,10 @@ export interface NotificationComposition {
   readonly process: (
     job: Job<NotificationDeliveryQueuePayload>,
   ) => Promise<unknown>;
-  readonly handleTriggerIds: (triggerIds: readonly string[]) => Promise<void>;
+  readonly handleTriggerIds: (
+    triggerIds: readonly string[],
+    telemetry?: SafeTraceContext,
+  ) => Promise<void>;
   readonly catchUp: () => Promise<number>;
   readonly close: () => Promise<void>;
 }
@@ -61,11 +67,16 @@ export function createNotificationComposition(options: {
       readonly attempt: number;
       readonly availableAt: Date;
     }[],
+    telemetry?: SafeTraceContext,
   ): Promise<void> {
     for (const item of items) {
       await enqueueNotificationDelivery(
         options.queue,
-        { outboxId: item.outboxId, attempt: item.attempt },
+        {
+          outboxId: item.outboxId,
+          attempt: item.attempt,
+          ...(telemetry === undefined ? {} : { telemetry }),
+        },
         { delay: Math.max(0, item.availableAt.getTime() - Date.now()) },
       );
     }
@@ -84,13 +95,16 @@ export function createNotificationComposition(options: {
         result.nextAttempt !== undefined &&
         result.availableAt !== undefined
       ) {
-        await enqueueOutbox([
-          {
-            outboxId: job.data.outboxId,
-            attempt: result.nextAttempt,
-            availableAt: result.availableAt,
-          },
-        ]);
+        await enqueueOutbox(
+          [
+            {
+              outboxId: job.data.outboxId,
+              attempt: result.nextAttempt,
+              availableAt: result.availableAt,
+            },
+          ],
+          job.data.telemetry,
+        );
       }
       options.logger.info('worker.notification.delivery.completed', {
         outboxId: job.data.outboxId,
@@ -98,9 +112,12 @@ export function createNotificationComposition(options: {
       });
       return result;
     },
-    async handleTriggerIds(triggerIds) {
+    async handleTriggerIds(triggerIds, telemetry) {
       const results = await orchestrator.orchestrateTriggerIds(triggerIds);
-      await enqueueOutbox(results.flatMap(({ outboxItems }) => outboxItems));
+      await enqueueOutbox(
+        results.flatMap(({ outboxItems }) => outboxItems),
+        telemetry,
+      );
     },
     async catchUp() {
       const limit = options.catchUpLimit ?? 1_000;

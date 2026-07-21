@@ -1,0 +1,37 @@
+name: Staging Security DAST
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-security-dast
+  cancel-in-progress: false
+
+jobs:
+  safe-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Run safe API and browser DAST smoke
+        env:
+          DAST_ALLOWED_ORIGIN: ${{ vars.STAGING_WEB_URL }}
+          DAST_API_BASE_URL: ${{ vars.STAGING_API_URL }}
+          DAST_WEB_BASE_URL: ${{ vars.STAGING_WEB_URL }}
+        run: node scripts/security/run-staging-dast.mjs
+      - name: Upload DAST evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-security-dast
+          path: reports/security/staging-dast.*
+          retention-days: 30

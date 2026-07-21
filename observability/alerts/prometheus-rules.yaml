@@ -1,0 +1,82 @@
+groups:
+  - name: atlas-critical-runtime
+    interval: 30s
+    rules:
+      - alert: AtlasApiAvailabilityFastBurn
+        expr: atlas:slo_api_availability_burn_rate_5m > 14.4 and atlas:slo_api_availability_burn_rate_1h > 14.4
+        for: 5m
+        labels:
+          { severity: critical, owner: platform-oncall, atlas_group: api-slo }
+        annotations:
+          runbook_url: https://runbooks.atlas.invalid/api-availability
+          dedup_key: api-availability-fast-burn
+          cooldown: 15m
+          recovery_notification: required
+      - alert: AtlasApiLatencyBudgetBurn
+        expr: atlas:slo_api_latency_burn_rate_30m > 6 and atlas:slo_api_latency_burn_rate_6h > 6
+        for: 10m
+        labels:
+          { severity: warning, owner: api-oncall, atlas_group: api-latency }
+        annotations:
+          runbook_url: https://runbooks.atlas.invalid/api-latency
+          dedup_key: api-latency-budget-burn
+          cooldown: 30m
+          recovery_notification: required
+      - alert: AtlasQueueLagHigh
+        expr: max by (environment, queue) (atlas_queue_lag_ms) > 60000
+        for: 10m
+        labels:
+          { severity: warning, owner: runtime-oncall, atlas_group: queues }
+        annotations:
+          runbook_url: https://runbooks.atlas.invalid/queue-lag
+          dedup_key: queue-lag-by-queue
+          cooldown: 30m
+          recovery_notification: required
+      - alert: AtlasWorkerStalledJobs
+        expr: increase(atlas_queue_stalled_total[10m]) > 0
+        for: 2m
+        labels:
+          { severity: critical, owner: runtime-oncall, atlas_group: workers }
+        annotations:
+          runbook_url: https://runbooks.atlas.invalid/worker-stalled
+          dedup_key: worker-stalled-by-queue
+          cooldown: 15m
+          recovery_notification: required
+      - alert: AtlasMarketDataStale
+        expr: max by (environment) (atlas_market_data_freshness_seconds) > 129600
+        for: 15m
+        labels:
+          {
+            severity: warning,
+            owner: market-data-oncall,
+            atlas_group: freshness,
+          }
+        annotations:
+          runbook_url: https://runbooks.atlas.invalid/market-data-stale
+          dedup_key: market-data-stale
+          cooldown: 60m
+          recovery_notification: required
+      - alert: AtlasAlertDeliveryFailure
+        expr: rate(atlas_notification_delivery_total{outcome="error"}[15m]) / clamp_min(rate(atlas_notification_delivery_total[15m]), 1) > 0.01
+        for: 15m
+        labels:
+          {
+            severity: critical,
+            owner: alerts-oncall,
+            atlas_group: notifications,
+          }
+        annotations:
+          runbook_url: https://runbooks.atlas.invalid/notification-delivery
+          dedup_key: notification-delivery-failure
+          cooldown: 30m
+          recovery_notification: required
+      - alert: AtlasBacktestTerminalRateLow
+        expr: atlas:slo_backtest_terminal_success_ratio_1h < 0.995
+        for: 15m
+        labels:
+          { severity: warning, owner: research-oncall, atlas_group: backtests }
+        annotations:
+          runbook_url: https://runbooks.atlas.invalid/backtest-terminal
+          dedup_key: backtest-terminal-rate
+          cooldown: 60m
+          recovery_notification: required

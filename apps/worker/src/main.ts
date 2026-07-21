@@ -10,7 +10,11 @@ async function bootstrap(): Promise<void> {
 
   try {
     const environment = parseEnvironment(process.env);
-    logger = new StructuredLogger(environment.WORKER_LOG_LEVEL);
+    logger = new StructuredLogger(environment.WORKER_LOG_LEVEL, undefined, {
+      environment: environment.ATLAS_ENV ?? 'local',
+      releaseVersion: environment.RELEASE_VERSION ?? 'development',
+      service: `atlas-worker-${environment.WORKER_ROLE}`,
+    });
     const runtime = await WorkerRuntime.start(environment, logger);
     installShutdownHandlers(runtime, logger);
   } catch (error: unknown) {

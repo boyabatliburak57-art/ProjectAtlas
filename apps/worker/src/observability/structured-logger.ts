@@ -1,4 +1,10 @@
-export type WorkerLogLevel = 'error' | 'warn' | 'info' | 'debug';
+import {
+  buildStructuredLogRecord,
+  type StructuredLogContext,
+  type StructuredLogLevel,
+} from '@atlas/types';
+
+export type WorkerLogLevel = StructuredLogLevel;
 
 type LogFields = Readonly<Record<string, unknown>>;
 
@@ -23,6 +29,11 @@ export class StructuredLogger {
   constructor(
     private readonly minimumLevel: WorkerLogLevel,
     private readonly sink: LogSink = stdoutSink,
+    private readonly context: StructuredLogContext = {
+      environment: process.env['ATLAS_ENV'] ?? 'local',
+      releaseVersion: process.env['RELEASE_VERSION'] ?? 'development',
+      service: 'atlas-worker',
+    },
   ) {}
 
   debug(event: string, fields: LogFields = {}): void {
@@ -46,14 +57,7 @@ export class StructuredLogger {
       return;
     }
 
-    this.sink.write(
-      JSON.stringify({
-        ...fields,
-        event,
-        level,
-        service: 'atlas-worker',
-        timestamp: new Date().toISOString(),
-      }),
-    );
+    const record = buildStructuredLogRecord(this.context, level, event, fields);
+    this.sink.write(JSON.stringify({ ...record, event: record.eventCode }));
   }
 }

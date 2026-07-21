@@ -12,6 +12,7 @@ Platform adapter aşağıdaki dış kaynakları uygulama manifestini değiştirm
 - private/TLS Redis ve `REDIS_URL`,
 - encrypted/versioned object storage endpoint, bucket ve scoped access credential,
 - `atlas-runtime-secrets` secret-manager senkronizasyonu,
+- internal metrics scrape için en az 32 karakterli `METRICS_BEARER_TOKEN`,
 - TLS certificate, edge/WAF/request limit ve ingress class,
 - DNS egress ile managed-service security group/network policy kuralları,
 - immutable registry digest, workload identity ve image-pull policy,
@@ -74,3 +75,16 @@ Production container'ları JavaScript source map dosyalarını içermez; browser
 üretimi kapalıdır. `API_DEBUG` ve `WORKER_DEBUG` staging/production'da `false` olmak zorundadır.
 Public error response stack trace içermez. Debug gerektiğinde süreli, erişim kontrollü internal
 telemetry kullanılır; debug image production rollout artifact'i değildir.
+
+## Observability adapter
+
+`observability/otel-collector.yaml` OpenTelemetry-compatible collector sınırını; `observability/grafana`
+dashboard provisioning artifact'lerini ve `observability/alerts` Prometheus/Alertmanager kurallarını
+tanımlar. Platform adapter bu dosyaları managed veya self-hosted telemetry backend'ine uygular.
+Telemetry endpoint ve credential'ları yalnız secret manager'dan sağlanır; manifestlere yazılmaz.
+
+Telemetry kaybı readiness'i veya kullanıcı işleminin kalıcı sonucunu değiştirmez. API ve worker
+best-effort telemetry üretir, PostgreSQL iş state'i authoritative kalır. Metric label allowlist'i
+user/resource/symbol/run kimliklerini reddeder. Staging release, dedicated synthetic identity ile
+health, session, market, scanner, portfolio ve backtest journey kontrollerini tamamlamadan release
+record üretmez.

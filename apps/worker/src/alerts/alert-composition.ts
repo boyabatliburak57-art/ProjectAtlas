@@ -19,6 +19,12 @@ import { InMemoryAlertMetrics } from './metrics';
 import { PostgresAlertEvaluationRepository } from './postgres-alert-evaluation-repository';
 import { PostgresAlertSourceEvaluator } from './postgres-alert-source-evaluator';
 
+const traceContextSchema = z.object({
+  correlationId: z.string().min(8).max(128).optional(),
+  traceparent: z.string().regex(/^00-[a-f0-9]{32}-[a-f0-9]{16}-0[01]$/u),
+  tracestate: z.string().max(512).optional(),
+});
+
 const eventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('market_data_updated'),
@@ -28,12 +34,14 @@ const eventSchema = z.discriminatedUnion('type', [
     barOpenTime: z.iso.datetime({ offset: true }),
     dataCutoffAt: z.iso.datetime({ offset: true }),
     isClosed: z.boolean(),
+    telemetry: traceContextSchema.optional(),
   }),
   z.object({
     type: z.literal('scan_completed'),
     eventId: z.string().min(1).max(160),
     scanRunId: z.uuid(),
     dataCutoffAt: z.iso.datetime({ offset: true }),
+    telemetry: traceContextSchema.optional(),
   }),
 ]);
 
@@ -73,14 +81,15 @@ export function createAlertComposition(options: {
       }
       const parsed = eventSchema.safeParse(job.data);
       if (!parsed.success) throw new UnrecoverableError('ALERT_EVENT_INVALID');
+      const event = normalizeEvent(parsed.data);
       try {
-        return await processor.process(parsed.data);
+        return await processor.process(event);
       } catch (error: unknown) {
         const retryable = isAlertErrorRetryable(error);
         options.logger.error('worker.alert.evaluation.failed', {
           errorType:
             error instanceof Error ? error.constructor.name : 'UnknownError',
-          eventId: parsed.data.eventId,
+          eventId: event.eventId,
           retryable,
         });
         if (!retryable && !(error instanceof UnrecoverableError)) {
@@ -105,6 +114,43 @@ export function createAlertComposition(options: {
     },
     close: options.close ?? (() => Promise.resolve()),
   };
+}
+
+function normalizeEvent(
+  event: z.infer<typeof eventSchema>,
+): AlertEvaluationQueuePayload {
+  const telemetry =
+    event.telemetry === undefined
+      ? {}
+      : {
+          telemetry: {
+            traceparent: event.telemetry.traceparent,
+            ...(event.telemetry.correlationId === undefined
+              ? {}
+              : { correlationId: event.telemetry.correlationId }),
+            ...(event.telemetry.tracestate === undefined
+              ? {}
+              : { tracestate: event.telemetry.tracestate }),
+          },
+        };
+  return event.type === 'market_data_updated'
+    ? {
+        barOpenTime: event.barOpenTime,
+        dataCutoffAt: event.dataCutoffAt,
+        eventId: event.eventId,
+        instrumentId: event.instrumentId,
+        isClosed: event.isClosed,
+        timeframe: event.timeframe,
+        type: event.type,
+        ...telemetry,
+      }
+    : {
+        dataCutoffAt: event.dataCutoffAt,
+        eventId: event.eventId,
+        scanRunId: event.scanRunId,
+        type: event.type,
+        ...telemetry,
+      };
 }
 
 export function createDefaultAlertComposition(

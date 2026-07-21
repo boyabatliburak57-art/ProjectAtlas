@@ -1,0 +1,38 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Release health by version",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (release, outcome) (rate(atlas_http_server_requests_total[5m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Error budget remaining",
+      "type": "gauge",
+      "targets": [
+        { "expr": "atlas_slo_error_budget_remaining_ratio", "refId": "A" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Rollout readiness",
+      "type": "stat",
+      "targets": [
+        { "expr": "min by (release) (atlas_workload_ready)", "refId": "A" }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["atlas", "release"],
+  "templating": { "list": [] },
+  "title": "Atlas — Release and Deployment",
+  "uid": "atlas-release"
+}

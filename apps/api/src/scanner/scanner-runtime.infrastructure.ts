@@ -21,11 +21,17 @@ import {
   ATLAS_QUEUE_NAMES,
   type ScannerRunQueuePayload,
 } from '@atlas/types';
-import { Inject, Injectable, type OnApplicationShutdown } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Optional,
+  type OnApplicationShutdown,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Queue, type ConnectionOptions } from 'bullmq';
 
+import { TelemetryService } from '../observability/telemetry.service';
 import type {
   ScanResultCursor,
   ScanResultDirection,
@@ -43,7 +49,10 @@ export class ApiDatabase implements OnApplicationShutdown {
   readonly database: Database;
   private readonly pool: ReturnType<typeof createDatabase>['pool'];
 
-  constructor(@Inject(ConfigService) config: ConfigService) {
+  constructor(
+    @Inject(ConfigService) config: ConfigService,
+    @Optional() private readonly telemetry?: TelemetryService,
+  ) {
     const created = createDatabase(config.getOrThrow<string>('DATABASE_URL'));
     this.database = created.db;
     this.pool = created.pool;
@@ -54,7 +63,15 @@ export class ApiDatabase implements OnApplicationShutdown {
   }
 
   async ping(): Promise<void> {
-    await this.pool.query('select 1');
+    if (this.telemetry === undefined) await this.pool.query('select 1');
+    else
+      await this.telemetry.span(
+        'postgresql.health',
+        { dbSystem: 'postgresql' },
+        async () => {
+          await this.pool.query('select 1');
+        },
+      );
   }
 }
 
@@ -158,18 +175,34 @@ export class BullMqScannerRunDispatcher
 {
   private queue: Queue<ScannerRunQueuePayload> | undefined;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly telemetry: TelemetryService,
+  ) {}
 
   async dispatch(input: ScannerRunQueuePayload): Promise<void> {
     const queue = this.queue ?? this.createQueue();
     this.queue = queue;
-    await queue.add(ATLAS_JOB_NAMES.scannerRun, input, {
-      attempts: 5,
-      backoff: { delay: 1_000, jitter: 0.5, type: 'exponential' },
-      jobId: scannerJobId(input.runId),
-      removeOnComplete: 100,
-      removeOnFail: false,
-    });
+    const traceContext = this.telemetry.safeQueueContext();
+    await this.telemetry.span(
+      'queue.enqueue.scanner',
+      { messagingSystem: 'redis', queue: ATLAS_QUEUE_NAMES.scanner },
+      () =>
+        queue.add(
+          ATLAS_JOB_NAMES.scannerRun,
+          {
+            ...input,
+            ...(traceContext === undefined ? {} : { telemetry: traceContext }),
+          },
+          {
+            attempts: 5,
+            backoff: { delay: 1_000, jitter: 0.5, type: 'exponential' },
+            jobId: scannerJobId(input.runId),
+            removeOnComplete: 100,
+            removeOnFail: false,
+          },
+        ),
+    );
   }
 
   async onApplicationShutdown(): Promise<void> {

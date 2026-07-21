@@ -5,10 +5,12 @@
     "api": {
       "required": [
         "API_CORS_ORIGIN",
+        "AUTH_SESSION_HMAC_KEY",
         "ATLAS_ENV",
         "CONFIG_SCHEMA_VERSION",
         "DATABASE_URL",
         "HEALTH_CHECK_DATABASE",
+        "METRICS_BEARER_TOKEN",
         "NODE_ENV",
         "OBJECT_STORAGE_ACCESS_KEY_ID",
         "OBJECT_STORAGE_BUCKET",
@@ -16,10 +18,14 @@
         "OBJECT_STORAGE_SECRET_ACCESS_KEY",
         "REDIS_URL",
         "RELEASE_COMMIT_SHA",
-        "RELEASE_VERSION"
+        "RELEASE_VERSION",
+        "SECURITY_RATE_LIMIT_ENABLED",
+        "TELEMETRY_POLICY_VERSION"
       ],
       "secrets": [
+        "AUTH_SESSION_HMAC_KEY",
         "DATABASE_URL",
+        "METRICS_BEARER_TOKEN",
         "OBJECT_STORAGE_ACCESS_KEY_ID",
         "OBJECT_STORAGE_SECRET_ACCESS_KEY",
         "REDIS_URL"
@@ -42,6 +48,7 @@
         "REDIS_URL",
         "RELEASE_COMMIT_SHA",
         "RELEASE_VERSION",
+        "TELEMETRY_POLICY_VERSION",
         "WORKER_HEALTH_FILE",
         "WORKER_ROLE"
       ],

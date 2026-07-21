@@ -1,0 +1,58 @@
+{
+  "policyVersion": "telemetry-v1",
+  "labelAllowlist": [
+    "environment",
+    "service",
+    "release",
+    "route",
+    "method",
+    "status_class",
+    "queue",
+    "job_type",
+    "outcome",
+    "error_category",
+    "operation"
+  ],
+  "forbiddenLabels": [
+    "user_id",
+    "email",
+    "instrument_id",
+    "symbol",
+    "request_id",
+    "correlation_id",
+    "trace_id",
+    "job_id",
+    "run_id",
+    "resource_id",
+    "url_path",
+    "payload"
+  ],
+  "platform": [
+    "http.server.requests",
+    "http.server.errors",
+    "http.server.duration.ms",
+    "process.cpu.utilization",
+    "process.memory.bytes",
+    "node.event_loop.lag.ms",
+    "db.pool.active",
+    "db.pool.waiting",
+    "db.operation.duration.ms",
+    "redis.operation.duration.ms",
+    "queue.lag.ms",
+    "queue.stalled.total",
+    "queue.retry.total",
+    "worker.duration.ms"
+  ],
+  "business": [
+    "scanner.terminal.total",
+    "alert.trigger.total",
+    "notification.delivery.total",
+    "portfolio.recalculation.total",
+    "market_data.freshness.seconds",
+    "backtest.terminal.total",
+    "experiment.terminal.total",
+    "duplicate_prevention.total",
+    "not_evaluable.total",
+    "cancellation.latency.ms"
+  ]
+}

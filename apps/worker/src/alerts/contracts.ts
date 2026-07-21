@@ -5,7 +5,10 @@ import type {
   AlertState,
   AlertTriggerPolicy,
 } from '@atlas/domain';
-import type { AlertEvaluationQueuePayload } from '@atlas/types';
+import type {
+  AlertEvaluationQueuePayload,
+  SafeTraceContext,
+} from '@atlas/types';
 
 export type AlertEvaluationEvent = AlertEvaluationQueuePayload;
 
@@ -44,7 +47,10 @@ export interface AlertEvaluationPersistenceInput {
 }
 
 export interface AlertTriggerSink {
-  handle(triggerIds: readonly string[]): Promise<void>;
+  handle(
+    triggerIds: readonly string[],
+    telemetry?: SafeTraceContext,
+  ): Promise<void>;
 }
 
 export interface AlertEvaluationRepository {

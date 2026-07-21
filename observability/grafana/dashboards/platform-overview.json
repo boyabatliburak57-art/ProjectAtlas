@@ -1,0 +1,43 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Request and job health",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(atlas_http_server_requests_total[5m]))",
+          "refId": "A"
+        },
+        { "expr": "sum(rate(atlas_worker_terminal_total[5m]))", "refId": "B" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "CPU, memory and event-loop lag",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (service) (atlas_process_cpu_utilization)",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (service) (atlas_process_memory_bytes)",
+          "refId": "B"
+        },
+        {
+          "expr": "max by (service) (atlas_node_event_loop_lag_ms)",
+          "refId": "C"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["atlas", "platform"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "Atlas — Platform Overview",
+  "uid": "atlas-platform"
+}

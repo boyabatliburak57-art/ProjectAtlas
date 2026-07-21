@@ -32,7 +32,7 @@ until docker exec "$redis" redis-cli ping >/dev/null 2>&1; do sleep 1; done
 
 database_url="postgresql://atlas:smoke-only@${postgres}:5432/atlas_smoke"
 redis_url="redis://${redis}:6379"
-common_env="--env ATLAS_ENV=staging --env NODE_ENV=production --env CONFIG_SCHEMA_VERSION=1 --env DATABASE_URL=${database_url} --env REDIS_URL=${redis_url} --env OBJECT_STORAGE_ENDPOINT=https://object.invalid --env OBJECT_STORAGE_BUCKET=atlas-smoke --env OBJECT_STORAGE_ACCESS_KEY_ID=smoke-access --env OBJECT_STORAGE_SECRET_ACCESS_KEY=smoke-secret --env RELEASE_VERSION=task-073 --env RELEASE_COMMIT_SHA=0000000"
+common_env="--env ATLAS_ENV=staging --env NODE_ENV=production --env CONFIG_SCHEMA_VERSION=1 --env TELEMETRY_POLICY_VERSION=telemetry-v1 --env AUTH_SESSION_HMAC_KEY=smoke-auth-session-hmac-key-000000 --env SECURITY_RATE_LIMIT_ENABLED=true --env METRICS_BEARER_TOKEN=smoke-metrics-token-change-me-00000000 --env DATABASE_URL=${database_url} --env REDIS_URL=${redis_url} --env OBJECT_STORAGE_ENDPOINT=https://object.invalid --env OBJECT_STORAGE_BUCKET=atlas-smoke --env OBJECT_STORAGE_ACCESS_KEY_ID=smoke-access --env OBJECT_STORAGE_SECRET_ACCESS_KEY=smoke-secret --env RELEASE_VERSION=task-073 --env RELEASE_COMMIT_SHA=0000000"
 
 # shellcheck disable=SC2086
 docker run --rm --network "$network" $common_env "$migration_image"

@@ -8,6 +8,7 @@ import type {
   ExperimentQueuePayload,
   NotificationDeliveryQueuePayload,
 } from '@atlas/types';
+import { parseTraceparent, type SafeTraceContext } from '@atlas/types';
 
 import {
   createDefaultBacktestComposition,
@@ -151,13 +152,13 @@ export class WorkerRuntime {
     );
     const systemWorker = new Worker(
       QUEUE_NAMES.system,
-      (job) => {
-        if (job.name !== JOB_NAMES.heartbeat) {
-          throw new Error('Unsupported internal job type');
-        }
-
-        return Promise.resolve(processHeartbeat(job));
-      },
+      (job) =>
+        runtimeJobTelemetry(logger, job, QUEUE_NAMES.system, () => {
+          if (job.name !== JOB_NAMES.heartbeat) {
+            throw new Error('Unsupported internal job type');
+          }
+          return Promise.resolve(processHeartbeat(job));
+        }),
       {
         autorun: roleConsumesQueue(role, 'scheduled'),
         concurrency: environment.WORKER_CONCURRENCY,
@@ -173,7 +174,10 @@ export class WorkerRuntime {
       );
     const marketDataWorker = new Worker(
       QUEUE_NAMES.marketData,
-      (job) => marketDataComposition.process(job),
+      (job) =>
+        runtimeJobTelemetry(logger, job, QUEUE_NAMES.marketData, () =>
+          marketDataComposition.process(job),
+        ),
       {
         autorun: roleConsumesQueue(role, 'market-data'),
         concurrency: environment.WORKER_CONCURRENCY,
@@ -185,7 +189,10 @@ export class WorkerRuntime {
       createDefaultScannerComposition(environment, logger);
     const scannerWorker = new Worker<ScannerRunJobData>(
       QUEUE_NAMES.scanner,
-      (job) => scannerComposition.process(job),
+      (job) =>
+        runtimeJobTelemetry(logger, job, QUEUE_NAMES.scanner, () =>
+          scannerComposition.process(job),
+        ),
       {
         autorun: roleConsumesQueue(role, 'scanner'),
         concurrency: environment.WORKER_CONCURRENCY,
@@ -202,12 +209,15 @@ export class WorkerRuntime {
     const alertComposition =
       injectedAlertComposition ??
       createDefaultAlertComposition(environment, logger, {
-        handle: (triggerIds) =>
-          notificationComposition.handleTriggerIds(triggerIds),
+        handle: (triggerIds, telemetry) =>
+          notificationComposition.handleTriggerIds(triggerIds, telemetry),
       });
     const alertWorker = new Worker<AlertEvaluationQueuePayload>(
       QUEUE_NAMES.alerts,
-      (job) => alertComposition.process(job),
+      (job) =>
+        runtimeJobTelemetry(logger, job, QUEUE_NAMES.alerts, () =>
+          alertComposition.process(job),
+        ),
       {
         autorun: roleConsumesQueue(role, 'alert'),
         concurrency: environment.WORKER_CONCURRENCY,
@@ -216,7 +226,10 @@ export class WorkerRuntime {
     );
     const notificationWorker = new Worker<NotificationDeliveryQueuePayload>(
       QUEUE_NAMES.notifications,
-      (job) => notificationComposition.process(job),
+      (job) =>
+        runtimeJobTelemetry(logger, job, QUEUE_NAMES.notifications, () =>
+          notificationComposition.process(job),
+        ),
       {
         autorun: roleConsumesQueue(role, 'notification'),
         concurrency: environment.WORKER_CONCURRENCY,
@@ -228,7 +241,10 @@ export class WorkerRuntime {
       createDefaultBacktestComposition(environment, logger);
     const backtestWorker = new Worker<BacktestRunQueuePayload>(
       QUEUE_NAMES.backtests,
-      (job) => backtestComposition.process(job),
+      (job) =>
+        runtimeJobTelemetry(logger, job, QUEUE_NAMES.backtests, () =>
+          backtestComposition.process(job),
+        ),
       {
         autorun: roleConsumesQueue(role, 'backtest'),
         concurrency: environment.WORKER_CONCURRENCY,
@@ -241,7 +257,10 @@ export class WorkerRuntime {
       createDefaultExperimentComposition(environment, logger, backtestQueue);
     const experimentWorker = new Worker<ExperimentQueuePayload>(
       QUEUE_NAMES.experiments,
-      (job) => experimentComposition.process(job),
+      (job) =>
+        runtimeJobTelemetry(logger, job, QUEUE_NAMES.experiments, () =>
+          experimentComposition.process(job),
+        ),
       {
         autorun: roleConsumesQueue(role, 'experiment'),
         concurrency: environment.WORKER_CONCURRENCY,
@@ -535,6 +554,65 @@ export class WorkerRuntime {
     if (healthFile === undefined || healthFile === '') return;
     await rm(healthFile, { force: true });
   }
+}
+
+async function runtimeJobTelemetry<T>(
+  logger: StructuredLogger,
+  job: Job,
+  queue: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const startedAt = performance.now();
+  const telemetry = readSafeTraceContext(job.data);
+  const traceId = parseTraceparent(telemetry?.traceparent)?.traceId;
+  const fields = {
+    ...(telemetry?.correlationId === undefined
+      ? {}
+      : { correlationId: telemetry.correlationId }),
+    ...(traceId === undefined ? {} : { traceId }),
+    jobId: job.id,
+    jobType: job.name,
+    queue,
+  };
+  logger.info('worker.job.started', { ...fields, outcome: 'started' });
+  try {
+    const result = await operation();
+    logger.info('worker.job.terminal', {
+      ...fields,
+      durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+      outcome: 'success',
+    });
+    return result;
+  } catch (error) {
+    logger.error('worker.job.terminal', {
+      ...fields,
+      durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+      errorCategory:
+        error instanceof Error ? error.constructor.name : 'UnknownError',
+      outcome: 'error',
+    });
+    throw error;
+  }
+}
+
+export function readSafeTraceContext(
+  value: unknown,
+): SafeTraceContext | undefined {
+  if (value === null || typeof value !== 'object') return undefined;
+  const telemetry = (value as { telemetry?: unknown }).telemetry;
+  if (telemetry === null || typeof telemetry !== 'object') return undefined;
+  const candidate = telemetry as Record<string, unknown>;
+  if (
+    typeof candidate['traceparent'] !== 'string' ||
+    parseTraceparent(candidate['traceparent']) === undefined
+  )
+    return undefined;
+  return {
+    traceparent: candidate['traceparent'],
+    ...(typeof candidate['correlationId'] === 'string'
+      ? { correlationId: candidate['correlationId'] }
+      : {}),
+  };
 }
 
 function enabledQueues(role: WorkerRole): readonly string[] {

@@ -7,7 +7,10 @@ import { AppModule } from './app.module';
 import { configureApplication } from './bootstrap/configure-application';
 
 async function bootstrap(): Promise<void> {
-  const application = await NestFactory.create(AppModule, { bufferLogs: true });
+  const application = await NestFactory.create(AppModule, {
+    bodyParser: false,
+    bufferLogs: true,
+  });
   const configService = application.get(ConfigService);
 
   configureApplication(application);

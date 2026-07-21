@@ -93,6 +93,8 @@ const strategyBacktestTables = [
   'strategy_revisions',
 ] as const;
 
+const incidentTables = ['incident_timeline_events', 'incidents'] as const;
+
 describe('PostgreSQL migrations', () => {
   const { db, pool } = createDatabase(requireTestDatabaseUrl());
 
@@ -108,7 +110,7 @@ describe('PostgreSQL migrations', () => {
     await pool.end();
   });
 
-  it('clean-migrates exactly the sixty domain tables', async () => {
+  it('clean-migrates exactly the seventy domain tables', async () => {
     const result = await pool.query<{ table_name: string }>(`
       select table_name
       from information_schema.tables
@@ -122,6 +124,7 @@ describe('PostgreSQL migrations', () => {
       'alert_states',
       'alert_triggers',
       'alerts',
+      'auth_sessions',
       'backtest_data_snapshots',
       'backtest_fills',
       'backtest_orders',
@@ -131,9 +134,13 @@ describe('PostgreSQL migrations', () => {
       'backtest_trades',
       'data_providers',
       'data_quality_issues',
+      'feature_flag_versions',
+      'feature_flags',
       'fundamental_metric_snapshots',
       'fundamental_ratio_snapshots',
       'fundamental_statement_snapshots',
+      'incident_timeline_events',
+      'incidents',
       'ingestion_runs',
       'instrument_symbol_history',
       'instruments',
@@ -143,6 +150,8 @@ describe('PostgreSQL migrations', () => {
       'notification_outbox',
       'notification_preferences',
       'notifications',
+      'operational_audit_events',
+      'password_reset_tokens',
       'pattern_definitions',
       'pattern_instances',
       'portfolio_cash_balances',
@@ -160,6 +169,7 @@ describe('PostgreSQL migrations', () => {
       'preset_scans',
       'price_bars',
       'provider_instrument_mappings',
+      'release_records',
       'research_experiment_runs',
       'research_experiments',
       'saved_scan_revisions',
@@ -172,6 +182,8 @@ describe('PostgreSQL migrations', () => {
       'scan_runs',
       'sector_market_snapshots',
       'sectors',
+      'security_rate_limit_buckets',
+      'security_users',
       'strategies',
       'strategy_revisions',
       'watchlist_item_tags',
@@ -909,6 +921,26 @@ describe('PostgreSQL migrations', () => {
   });
 
   it('executes the documented destructive rollback and reapplies forward', async () => {
+    const securityRollbackSql = await readFile(
+      resolve(
+        migrationFolder(),
+        'rollback/0011_remarkable_union_jack.down.sql',
+      ),
+      'utf8',
+    );
+    await pool.query(securityRollbackSql);
+    const incidentRollbackSql = await readFile(
+      resolve(migrationFolder(), 'rollback/0010_pale_killer_shrike.down.sql'),
+      'utf8',
+    );
+    await pool.query(incidentRollbackSql);
+    const incidentsRolledBack = await pool.query<{ table_name: string }>(
+      `select table_name from information_schema.tables
+       where table_schema = 'public' and table_name = any($1::text[])`,
+      [incidentTables],
+    );
+    expect(incidentsRolledBack.rows).toEqual([]);
+
     const snapshotIndexRollbackSql = await readFile(
       resolve(migrationFolder(), 'rollback/0009_messy_terror.down.sql'),
       'utf8',
@@ -1013,7 +1045,7 @@ describe('PostgreSQL migrations', () => {
       where created_at in (
         select created_at from drizzle.__drizzle_migrations
         order by created_at desc
-        limit 8
+        limit 10
       )
     `);
     await runMigrations(db);
@@ -1077,5 +1109,15 @@ describe('PostgreSQL migrations', () => {
     expect(
       strategyBacktestReapplied.rows.map(({ table_name }) => table_name),
     ).toEqual([...strategyBacktestTables].sort());
+
+    const incidentsReapplied = await pool.query<{ table_name: string }>(
+      `select table_name from information_schema.tables
+       where table_schema = 'public' and table_name = any($1::text[])
+       order by table_name`,
+      [incidentTables],
+    );
+    expect(incidentsReapplied.rows.map(({ table_name }) => table_name)).toEqual(
+      [...incidentTables].sort(),
+    );
   });
 });

@@ -15,8 +15,8 @@ function migrationSql(): string {
 describe('generated PostgreSQL migrations', () => {
   const sql = migrationSql();
 
-  it('creates the sixty scoped tables and current revision view', () => {
-    expect(sql.match(/CREATE TABLE/g)).toHaveLength(60);
+  it('creates the seventy scoped tables and current revision view', () => {
+    expect(sql.match(/CREATE TABLE/g)).toHaveLength(70);
     expect(sql).toContain('CREATE VIEW "public"."current_price_bars"');
   });
 
@@ -166,5 +166,36 @@ describe('generated PostgreSQL migrations', () => {
     expect(sql).toContain('research_experiment_runs_experiment_owner_fk');
     expect(sql).toContain('numeric(28, 10)');
     expect(sql).toContain('numeric(20, 12)');
+  });
+
+  it('contains DB-009 incident and immutable timeline guards', () => {
+    expect(sql).toContain('CREATE TABLE "incidents"');
+    expect(sql).toContain('CREATE TABLE "incident_timeline_events"');
+    expect(sql).toContain('incident_timeline_events_incident_sequence_unique');
+    expect(sql).toContain('prevent_incident_timeline_mutation');
+    expect(sql).toContain('incidents_status_severity_detected_idx');
+  });
+
+  it('contains authentication and operational security guards', () => {
+    for (const table of [
+      'security_users',
+      'auth_sessions',
+      'password_reset_tokens',
+      'security_rate_limit_buckets',
+      'feature_flags',
+      'feature_flag_versions',
+      'operational_audit_events',
+      'release_records',
+    ])
+      expect(sql).toContain(`CREATE TABLE "${table}"`);
+
+    expect(sql).toContain('auth_sessions_token_hash_unique');
+    expect(sql).toContain('password_reset_tokens_hash_unique');
+    expect(sql).toContain('security_rate_limit_bucket_unique');
+    expect(sql).toContain(
+      'feature_flag_versions_flag_version_environment_unique',
+    );
+    expect(sql).toContain('prevent_immutable_operational_record_mutation');
+    expect(sql).toContain('release_records_digest_check');
   });
 });

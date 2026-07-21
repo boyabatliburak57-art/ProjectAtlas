@@ -1,0 +1,44 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Alert trigger outcome",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(atlas_alert_trigger_total[5m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Notification delivery outcome",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(atlas_notification_delivery_total[5m]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Duplicate prevention",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (operation) (rate(atlas_duplicate_prevention_total[5m]))",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["atlas", "alerts"],
+  "templating": { "list": [] },
+  "title": "Atlas — Alerts and Notifications",
+  "uid": "atlas-alerts"
+}

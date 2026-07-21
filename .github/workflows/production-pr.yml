@@ -76,6 +76,13 @@ jobs:
           pnpm config:check
           pnpm deploy:validate
 
+      - name: Observability provisioning and synthetic contract
+        run: |
+          pnpm observability:validate
+          pnpm alert:validate
+          pnpm synthetic:self-test
+          pnpm slo:report
+
       - name: OpenAPI and migration validation
         run: |
           pnpm --filter @atlas/api openapi:check
@@ -88,6 +95,8 @@ jobs:
 
       - name: Security scans
         run: |
+          pnpm security:validate
+          pnpm license:check
           pnpm secret:scan:test
           pnpm secret:scan
           pnpm audit --prod --audit-level high

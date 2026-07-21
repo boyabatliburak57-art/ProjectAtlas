@@ -89,12 +89,30 @@ describe('API scaffold', () => {
       .get('/health/live')
       .set('x-request-id', 'request_12345678')
       .set('x-correlation-id', 'correlation_12345678')
+      .set(
+        'traceparent',
+        '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
+      )
       .expect(200);
     const body = healthResponseSchema.parse(response.body);
 
     expect(response.headers['x-request-id']).toBe('request_12345678');
     expect(response.headers['x-correlation-id']).toBe('correlation_12345678');
+    expect(response.headers['traceparent']).toMatch(
+      /^00-4bf92f3577b34da6a3ce929d0e0e4736-[a-f0-9]{16}-01$/u,
+    );
     expect(body.meta.requestId).toBe('request_12345678');
+  });
+
+  it('exports bounded platform metrics without request identifiers', async () => {
+    const response = await request(getHttpServer(application))
+      .get('/metrics')
+      .expect(200);
+
+    expect(response.text).toContain('atlas_http_server_requests_total');
+    expect(response.text).toContain('atlas_process_memory_bytes');
+    expect(response.text).not.toContain('request_12345678');
+    expect(response.text).not.toContain('correlation_12345678');
   });
 
   it('returns the standard error envelope without a stack trace', async () => {

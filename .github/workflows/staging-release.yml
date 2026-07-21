@@ -100,12 +100,19 @@ jobs:
       - name: Health and synthetic smoke
         env:
           API_URL: ${{ vars.STAGING_API_URL }}
+          SYNTHETIC_BACKTEST_PAYLOAD: ${{ vars.STAGING_SYNTHETIC_BACKTEST_PAYLOAD }}
+          SYNTHETIC_BASE_URL: ${{ vars.STAGING_API_URL }}
+          SYNTHETIC_BEARER_TOKEN: ${{ secrets.STAGING_SYNTHETIC_BEARER_TOKEN }}
+          SYNTHETIC_PORTFOLIO_ID: ${{ vars.STAGING_SYNTHETIC_PORTFOLIO_ID }}
+          SYNTHETIC_SCANNER_PAYLOAD: ${{ vars.STAGING_SYNTHETIC_SCANNER_PAYLOAD }}
           WEB_URL: ${{ vars.STAGING_WEB_URL }}
         run: |
           curl --fail --silent --show-error "$API_URL/health/live"
           curl --fail --silent --show-error "$API_URL/health/startup"
           curl --fail --silent --show-error "$API_URL/health/ready"
           curl --fail --silent --show-error "$WEB_URL/health"
+          pnpm observability:validate
+          node scripts/production/run-staging-synthetics.mjs
 
       - name: Write release record
         env:

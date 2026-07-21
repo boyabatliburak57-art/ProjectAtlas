@@ -63,7 +63,10 @@ export class AlertEvaluationProcessor {
         this.dependencies.metrics.increment('alert.evaluation.not_evaluable');
       }
       if (persisted.triggerIds.length > 0) {
-        await this.dependencies.triggerSink?.handle(persisted.triggerIds);
+        await this.dependencies.triggerSink?.handle(
+          persisted.triggerIds,
+          event.telemetry,
+        );
       }
     }
     this.dependencies.metrics.increment('alert.trigger.count', triggerCount);

@@ -62,6 +62,16 @@ import {
   backtestSeriesChunks,
   researchExperiments,
   researchExperimentRuns,
+  incidents,
+  incidentTimelineEvents,
+  authSessions,
+  featureFlags,
+  featureFlagVersions,
+  operationalAuditEvents,
+  passwordResetTokens,
+  releaseRecords,
+  securityRateLimitBuckets,
+  securityUsers,
 } from './index';
 
 describe('initial database schema', () => {
@@ -230,6 +240,37 @@ describe('initial database schema', () => {
       'backtest_series_chunks',
       'research_experiments',
       'research_experiment_runs',
+    ]);
+  });
+
+  it('exports the DB-009 incident runtime tables', () => {
+    expect([incidents, incidentTimelineEvents].map(getTableName)).toEqual([
+      'incidents',
+      'incident_timeline_events',
+    ]);
+  });
+
+  it('exports the eight security authority and operational-control tables', () => {
+    expect(
+      [
+        securityUsers,
+        authSessions,
+        passwordResetTokens,
+        securityRateLimitBuckets,
+        featureFlags,
+        featureFlagVersions,
+        operationalAuditEvents,
+        releaseRecords,
+      ].map(getTableName),
+    ).toEqual([
+      'security_users',
+      'auth_sessions',
+      'password_reset_tokens',
+      'security_rate_limit_buckets',
+      'feature_flags',
+      'feature_flag_versions',
+      'operational_audit_events',
+      'release_records',
     ]);
   });
 });
