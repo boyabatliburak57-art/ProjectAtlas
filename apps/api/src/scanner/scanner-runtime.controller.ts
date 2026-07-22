@@ -7,6 +7,7 @@ import {
   Headers,
   HttpCode,
   Inject,
+  Optional,
   Param,
   Post,
   Query,
@@ -42,6 +43,10 @@ import {
   ScanRunResultsQueryDto,
 } from './scanner-runtime.dto';
 import { ScannerRuntimeService } from './scanner-runtime.service';
+import {
+  FeatureFlagRuntimeService,
+  KILL_SWITCHES,
+} from '../operations/feature-flag-runtime.service';
 
 @ApiTags('Scanner Runtime')
 @ApiBearerAuth()
@@ -52,6 +57,7 @@ export class ScannerRuntimeController {
     private readonly scanner: ScannerRuntimeService,
     @Inject(AUTHENTICATED_USER_RESOLVER)
     private readonly authenticatedUser: AuthenticatedUserResolver,
+    @Optional() private readonly flags?: FeatureFlagRuntimeService,
   ) {}
 
   @Post()
@@ -72,8 +78,12 @@ export class ScannerRuntimeController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: CreateScanRunDto,
   ): Promise<ScanRunResponseDto> {
+    const userId = this.authenticatedUser(request);
+    await this.flags?.assertWriteAllowed(KILL_SWITCHES.scannerCreation, {
+      userId,
+    });
     const result = await this.scanner.create(
-      this.authenticatedUser(request),
+      userId,
       idempotencyKey,
       body,
       getCorrelationId(request),

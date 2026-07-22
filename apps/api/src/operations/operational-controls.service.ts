@@ -14,6 +14,7 @@ import { desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { ApiDatabase } from '../scanner/scanner-runtime.infrastructure';
+import { FeatureFlagRuntimeService } from './feature-flag-runtime.service';
 
 const forbiddenOperationalKey =
   /^(?:__proto__|constructor|prototype)$|authorization|cookie|password|secret|token|connection.?string|raw.?payload/iu;
@@ -26,17 +27,43 @@ const safeOperationalObject = z
 const flagInput = z.object({
   key: z.string().regex(/^[a-z][a-z0-9_.-]{2,119}$/u),
   description: z.string().trim().min(1).max(2_000),
-  flagType: z.enum(['release', 'experiment', 'kill_switch']),
+  flagType: z.enum([
+    'release',
+    'experiment',
+    'kill_switch',
+    'entitlement',
+    'maintenance',
+  ]),
   defaultEnabled: z.boolean().default(false),
   owner: z.string().trim().min(1).max(120).optional(),
+  expiresAt: z.coerce.date().optional(),
 });
+const targetingValue = z
+  .union([
+    z.string().trim().min(1).max(500),
+    z.array(z.string().trim().min(1).max(500)).max(100),
+  ])
+  .transform((value) => (typeof value === 'string' ? [value] : value));
+const targetingRulesInput = z
+  .object({
+    cohort: targetingValue.optional(),
+    message: targetingValue.optional(),
+    region: targetingValue.optional(),
+    resourceId: targetingValue.optional(),
+    userId: z
+      .union([z.string().uuid(), z.array(z.string().uuid()).max(100)])
+      .transform((value) => (typeof value === 'string' ? [value] : value))
+      .optional(),
+  })
+  .strict();
 const flagVersionInput = z.object({
   enabled: z.boolean(),
   environment: z.enum(['test', 'staging', 'production']),
   rolloutPercentage: z.number().min(0).max(100).optional(),
-  targetingRules: safeOperationalObject.default({}),
+  targetingRules: targetingRulesInput.default({}),
   reason: z.string().trim().min(8).max(4_096),
   confirmation: z.literal('CONFIRM_OPERATIONAL_CHANGE'),
+  expectedVersion: z.number().int().min(0).optional(),
 });
 const releaseInput = z.object({
   version: z.string().trim().min(1).max(128),
@@ -62,6 +89,7 @@ export class OperationalControlsService {
   constructor(
     private readonly connection: ApiDatabase,
     config: ConfigService,
+    private readonly runtime?: FeatureFlagRuntimeService,
   ) {
     this.environment = config.getOrThrow<string>('ATLAS_ENV');
   }
@@ -71,6 +99,40 @@ export class OperationalControlsService {
       .select()
       .from(featureFlags)
       .orderBy(featureFlags.key);
+  }
+
+  async getFlag(key: string) {
+    const rows = await this.connection.database
+      .select()
+      .from(featureFlags)
+      .where(eq(featureFlags.key, key))
+      .limit(1);
+    const flag = rows[0];
+    if (flag === undefined)
+      throw new BadRequestException({
+        code: 'FEATURE_FLAG_NOT_FOUND',
+        message: 'Feature flag was not found',
+      });
+    return flag;
+  }
+
+  async flagHistory(key: string) {
+    const flag = await this.getFlag(key);
+    const versions = await this.connection.database
+      .select()
+      .from(featureFlagVersions)
+      .where(
+        sql`${featureFlagVersions.flagId} = ${flag.id} and ${featureFlagVersions.environment} = ${this.environment}`,
+      )
+      .orderBy(desc(featureFlagVersions.createdAt));
+    return { flag, versions };
+  }
+
+  async expiredFlags(now = new Date()) {
+    const flags = await this.listFlags();
+    return flags.filter(
+      (flag) => flag.expiresAt !== null && flag.expiresAt <= now,
+    );
   }
 
   async createFlag(actor: OperationalActorContext, body: unknown) {
@@ -123,6 +185,27 @@ export class OperationalControlsService {
           code: 'FEATURE_FLAG_NOT_FOUND',
           message: 'Feature flag was not found',
         });
+      await transaction.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`${id}:${value.environment}`}))`,
+      );
+      const latest = await transaction
+        .select({ version: featureFlagVersions.version })
+        .from(featureFlagVersions)
+        .where(
+          sql`${featureFlagVersions.flagId} = ${id} and ${featureFlagVersions.environment} = ${value.environment}`,
+        )
+        .orderBy(desc(featureFlagVersions.version))
+        .limit(1);
+      const currentVersion = latest[0]?.version ?? 0;
+      if (
+        value.expectedVersion !== undefined &&
+        value.expectedVersion !== currentVersion
+      )
+        throw new ConflictException({
+          code: 'FEATURE_FLAG_VERSION_CONFLICT',
+          details: { currentVersion },
+          message: 'Feature flag version changed',
+        });
       const versions = await transaction
         .insert(featureFlagVersions)
         .values({
@@ -136,7 +219,7 @@ export class OperationalControlsService {
               ? null
               : value.rolloutPercentage.toFixed(2),
           targetingRules: value.targetingRules,
-          version: sql`coalesce((select max(version) from feature_flag_versions where flag_id = ${id} and environment = ${value.environment}), 0) + 1`,
+          version: currentVersion + 1,
         })
         .returning();
       const version = versions[0]!;
@@ -154,8 +237,24 @@ export class OperationalControlsService {
             value.reason,
           ),
         );
+      await this.runtime?.invalidate(flag.key);
       return version;
     });
+  }
+
+  async addFlagVersionByKey(
+    actor: OperationalActorContext,
+    key: string,
+    body: unknown,
+  ) {
+    const value = parse(flagVersionInput, body);
+    if (value.expectedVersion === undefined)
+      throw new BadRequestException({
+        code: 'EXPECTED_VERSION_REQUIRED',
+        message: 'Expected version is required',
+      });
+    const flag = await this.getFlag(key);
+    return this.addFlagVersion(actor, flag.id, value);
   }
 
   listReleases() {

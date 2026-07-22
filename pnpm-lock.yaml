@@ -65,6 +65,9 @@ importers:
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@types/pg@8.20.0)(pg@8.22.0)
+      ioredis:
+        specifier: 5.10.1
+        version: 5.10.1
       reflect-metadata:
         specifier: 0.2.2
         version: 0.2.2

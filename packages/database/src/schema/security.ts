@@ -168,7 +168,7 @@ export const featureFlags = pgTable(
     unique('feature_flags_key_unique').on(table.key),
     check(
       'feature_flags_type_check',
-      sql`${table.flagType} in ('release', 'experiment', 'kill_switch')`,
+      sql`${table.flagType} in ('release', 'experiment', 'kill_switch', 'entitlement', 'maintenance')`,
     ),
   ],
 );

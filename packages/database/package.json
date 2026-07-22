@@ -25,7 +25,7 @@
     "db:seed": "tsx src/cli/seed.ts",
     "lint": "eslint src drizzle.config.ts",
     "test": "vitest run --config vitest.config.ts",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration": "pnpm --filter @atlas/domain build && vitest run --config vitest.integration.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

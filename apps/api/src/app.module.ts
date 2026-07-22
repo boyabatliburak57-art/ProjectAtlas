@@ -32,7 +32,17 @@ import { IncidentRepository } from './operations/incidents.repository';
 import { IncidentsService } from './operations/incidents.service';
 import { OperationalControlsController } from './operations/operational-controls.controller';
 import { OperationalControlsService } from './operations/operational-controls.service';
+import { FeatureFlagRuntimeService } from './operations/feature-flag-runtime.service';
+import {
+  AdminOperationsController,
+  FeatureFlagsAdminController,
+  MaintenanceAdminController,
+  RecoveryAdminController,
+} from './operations/admin-operations.controller';
+import { AdminOperationsService } from './operations/admin-operations.service';
 import { AuthController } from './security/auth.controller';
+import { AccountDeletionController } from './security/account-deletion.controller';
+import { AccountDeletionService } from './security/account-deletion.service';
 import { AuthSessionService } from './security/auth-session.service';
 import { AuthenticationMiddleware } from './security/authentication.middleware';
 import { AbusePreventionMiddleware } from './security/abuse-prevention.middleware';
@@ -171,6 +181,7 @@ import {
   controllers: [
     HealthController,
     AuthController,
+    AccountDeletionController,
     IndicatorCatalogController,
     ScannerRuntimeController,
     ScannerCatalogController,
@@ -191,6 +202,10 @@ import {
     ExperimentsController,
     IncidentsController,
     OperationalControlsController,
+    AdminOperationsController,
+    FeatureFlagsAdminController,
+    MaintenanceAdminController,
+    RecoveryAdminController,
     MetricsController,
   ],
   imports: [
@@ -205,6 +220,7 @@ import {
     HealthService,
     TelemetryService,
     AuthSessionService,
+    AccountDeletionService,
     AuthenticationMiddleware,
     AbusePreventionMiddleware,
     IncidentRepository,
@@ -384,6 +400,8 @@ import {
     ExperimentsService,
     IncidentsService,
     OperationalControlsService,
+    FeatureFlagRuntimeService,
+    AdminOperationsService,
   ],
 })
 export class AppModule implements NestModule {

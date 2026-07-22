@@ -6,6 +6,7 @@ import {
   Headers,
   HttpCode,
   Inject,
+  Optional,
   Param,
   Post,
   Query,
@@ -36,6 +37,10 @@ import {
 } from '../common/auth/authenticated-user';
 import { getRequestId } from '../common/http/request-context';
 import {
+  FeatureFlagRuntimeService,
+  KILL_SWITCHES,
+} from '../operations/feature-flag-runtime.service';
+import {
   CommitPortfolioImportDto,
   PortfolioImportResponseDto,
   PortfolioImportRowsQueryDto,
@@ -62,6 +67,7 @@ export class PortfolioImportsController {
     private readonly service: PortfolioImportsService,
     @Inject(AUTHENTICATED_USER_RESOLVER)
     private readonly authenticatedUser: AuthenticatedUserResolver,
+    @Optional() private readonly flags?: FeatureFlagRuntimeService,
   ) {}
 
   @Post('imports')
@@ -86,8 +92,13 @@ export class PortfolioImportsController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @UploadedFile() file: CsvUpload | undefined,
   ) {
+    const userId = this.user(request);
+    await this.flags?.assertWriteAllowed(KILL_SWITCHES.portfolioImports, {
+      resourceId: portfolioId,
+      userId,
+    });
     const result = await this.service.preview(
-      this.user(request),
+      userId,
       portfolioId,
       idempotencyKey,
       file
@@ -158,8 +169,13 @@ export class PortfolioImportsController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: CommitPortfolioImportDto,
   ) {
+    const userId = this.user(request);
+    await this.flags?.assertWriteAllowed(KILL_SWITCHES.portfolioImports, {
+      resourceId: portfolioId,
+      userId,
+    });
     const result = await this.service.commit(
-      this.user(request),
+      userId,
       portfolioId,
       jobId,
       idempotencyKey,
@@ -194,6 +210,7 @@ export class PortfolioImportsController {
     @Res() response: Response,
     @Param('portfolioId') portfolioId: string,
   ) {
+    await this.assertExportAllowed(request, portfolioId);
     return this.csv(
       response,
       `portfolio-${portfolioId}-transactions.csv`,
@@ -207,6 +224,7 @@ export class PortfolioImportsController {
     @Res() response: Response,
     @Param('portfolioId') portfolioId: string,
   ) {
+    await this.assertExportAllowed(request, portfolioId);
     return this.csv(
       response,
       `portfolio-${portfolioId}-positions.csv`,
@@ -220,6 +238,7 @@ export class PortfolioImportsController {
     @Res() response: Response,
     @Param('portfolioId') portfolioId: string,
   ) {
+    await this.assertExportAllowed(request, portfolioId);
     return this.csv(
       response,
       `portfolio-${portfolioId}-performance.csv`,
@@ -229,6 +248,16 @@ export class PortfolioImportsController {
 
   private user(request: Request): string {
     return this.authenticatedUser(request);
+  }
+
+  private async assertExportAllowed(
+    request: Request,
+    portfolioId: string,
+  ): Promise<void> {
+    await this.flags?.assertWriteAllowed(KILL_SWITCHES.exports, {
+      resourceId: portfolioId,
+      userId: this.user(request),
+    });
   }
 
   private response(request: Request, data: unknown) {

@@ -38,6 +38,7 @@ describe('OpenAPI document', () => {
     expect(
       document.paths['/api/v1/auth/password-reset/confirm']?.post,
     ).toBeDefined();
+    expect(document.paths['/api/v1/account/deletion']?.post).toBeDefined();
     expect(document.paths['/api/v1/indicators']?.get).toBeDefined();
     expect(document.paths['/api/v1/indicators/{code}']?.get).toBeDefined();
     expect(document.paths['/api/v1/scanner/runs']?.post).toBeDefined();
@@ -352,6 +353,30 @@ describe('OpenAPI document', () => {
       document.paths['/api/v1/admin/operations/releases']?.post,
     ).toBeDefined();
     expect(document.paths['/api/v1/admin/operations/audit']?.get).toBeDefined();
+    expect(document.paths['/api/v1/admin/feature-flags']?.get).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/feature-flags/{key}']?.get,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/feature-flags/{key}/versions']?.post,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/feature-flags/{key}/history']?.get,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/operations/overview']?.get,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/operations/queues']?.get,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/operations/queues/{queue}/pause']?.post,
+    ).toBeDefined();
+    expect(
+      document.paths['/api/v1/admin/maintenance/kill-switches/{key}/enable']
+        ?.post,
+    ).toBeDefined();
+    expect(document.paths['/api/v1/admin/recovery/status']?.get).toBeDefined();
     expect(document.paths['/api/v1/admin/incidents/{id}']?.get).toBeDefined();
     expect(
       document.paths['/api/v1/admin/incidents/{id}/acknowledge']?.post,

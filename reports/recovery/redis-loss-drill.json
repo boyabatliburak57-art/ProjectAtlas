@@ -1,0 +1,12 @@
+{
+  "drillId": "e6d5c151-a467-4845-a6e0-bab8ca520902",
+  "status": "PASS",
+  "apiFallback": "PASS",
+  "cacheRebuild": "PASS",
+  "duplicateJobs": 0,
+  "durableLoss": 0,
+  "queueReconciliation": "PASS",
+  "redisRestart": "PASS",
+  "durableFingerprintEqual": true,
+  "environment": "local PostgreSQL and restarted Redis containers"
+}

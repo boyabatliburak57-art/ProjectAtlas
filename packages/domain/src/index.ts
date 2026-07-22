@@ -8,3 +8,4 @@ export * from './watchlists/index.js';
 export * from './portfolio/index.js';
 export * from './strategies/index.js';
 export * from './backtesting/index.js';
+export * from './operations/index.js';

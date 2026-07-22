@@ -112,6 +112,17 @@ jobs:
           printf '%s' "$KUBE_CONFIG" | base64 --decode > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
 
+      - name: Verify persisted restore rehearsal gate
+        env:
+          MIGRATION_IMAGE: ${{ inputs.migration_image }}
+        run: |
+          node scripts/production/render-recovery-gate-job.mjs \
+            "$MIGRATION_IMAGE" "${GITHUB_RUN_ID}" \
+            "${{ inputs.restore_drill_id }}" /tmp/recovery-gate.yaml
+          kubectl apply -f /tmp/recovery-gate.yaml
+          kubectl wait --for=condition=complete --timeout=5m \
+            "job/atlas-recovery-gate-${GITHUB_RUN_ID}" -n atlas
+
       - name: Migration compatibility and apply
         if: inputs.action == 'deploy' && inputs.migration_phase != 'none'
         env:

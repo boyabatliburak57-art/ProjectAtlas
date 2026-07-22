@@ -35,6 +35,7 @@ import {
   createDefaultNotificationComposition,
   type NotificationComposition,
 } from '../notifications/notification-composition';
+import { RecoveryComposition } from '../recovery/recovery-composition';
 import {
   createHeartbeatJobId,
   DEFAULT_JOB_OPTIONS,
@@ -47,6 +48,10 @@ import {
   type ScannerComposition,
 } from '../scanner/scanner-composition';
 import type { ScannerRunJobData } from '../scanner/contracts';
+import {
+  WorkerFeatureFlags,
+  WORKER_KILL_SWITCHES,
+} from '../operations/worker-feature-flags';
 
 interface DeadLetterData {
   readonly attemptsMade: number;
@@ -97,6 +102,8 @@ export class WorkerRuntime {
     private readonly notificationComposition: NotificationComposition,
     private readonly backtestComposition: BacktestComposition,
     private readonly experimentComposition: ExperimentComposition,
+    private readonly recoveryComposition: RecoveryComposition,
+    private readonly featureFlags: WorkerFeatureFlags,
     private readonly workerId: string,
   ) {}
 
@@ -150,15 +157,16 @@ export class WorkerRuntime {
       QUEUE_NAMES.experiments,
       { connection, defaultJobOptions: DEFAULT_JOB_OPTIONS },
     );
+    const recoveryComposition = new RecoveryComposition(environment, logger);
+    const featureFlags = new WorkerFeatureFlags(environment);
     const systemWorker = new Worker(
       QUEUE_NAMES.system,
       (job) =>
-        runtimeJobTelemetry(logger, job, QUEUE_NAMES.system, () => {
-          if (job.name !== JOB_NAMES.heartbeat) {
-            throw new Error('Unsupported internal job type');
-          }
-          return Promise.resolve(processHeartbeat(job));
-        }),
+        runtimeJobTelemetry(logger, job, QUEUE_NAMES.system, () =>
+          job.name === JOB_NAMES.heartbeat
+            ? Promise.resolve({ ...processHeartbeat(job) })
+            : recoveryComposition.process(job),
+        ),
       {
         autorun: roleConsumesQueue(role, 'scheduled'),
         concurrency: environment.WORKER_CONCURRENCY,
@@ -175,9 +183,19 @@ export class WorkerRuntime {
     const marketDataWorker = new Worker(
       QUEUE_NAMES.marketData,
       (job) =>
-        runtimeJobTelemetry(logger, job, QUEUE_NAMES.marketData, () =>
-          marketDataComposition.process(job),
-        ),
+        runtimeJobTelemetry(logger, job, QUEUE_NAMES.marketData, async () => {
+          if (job.name === JOB_NAMES.fundamentalsIngest)
+            await featureFlags.assertAllowed(
+              WORKER_KILL_SWITCHES.fundamentalsRefresh,
+              job.id ?? 'market-data-job',
+            );
+          if (job.name === JOB_NAMES.patternsDetect)
+            await featureFlags.assertAllowed(
+              WORKER_KILL_SWITCHES.patternRefresh,
+              job.id ?? 'market-data-job',
+            );
+          return marketDataComposition.process(job);
+        }),
       {
         autorun: roleConsumesQueue(role, 'market-data'),
         concurrency: environment.WORKER_CONCURRENCY,
@@ -215,9 +233,13 @@ export class WorkerRuntime {
     const alertWorker = new Worker<AlertEvaluationQueuePayload>(
       QUEUE_NAMES.alerts,
       (job) =>
-        runtimeJobTelemetry(logger, job, QUEUE_NAMES.alerts, () =>
-          alertComposition.process(job),
-        ),
+        runtimeJobTelemetry(logger, job, QUEUE_NAMES.alerts, async () => {
+          await featureFlags.assertAllowed(
+            WORKER_KILL_SWITCHES.alertEvaluation,
+            job.id ?? 'alert-job',
+          );
+          return alertComposition.process(job);
+        }),
       {
         autorun: roleConsumesQueue(role, 'alert'),
         concurrency: environment.WORKER_CONCURRENCY,
@@ -227,8 +249,17 @@ export class WorkerRuntime {
     const notificationWorker = new Worker<NotificationDeliveryQueuePayload>(
       QUEUE_NAMES.notifications,
       (job) =>
-        runtimeJobTelemetry(logger, job, QUEUE_NAMES.notifications, () =>
-          notificationComposition.process(job),
+        runtimeJobTelemetry(
+          logger,
+          job,
+          QUEUE_NAMES.notifications,
+          async () => {
+            await featureFlags.assertAllowed(
+              WORKER_KILL_SWITCHES.emailDelivery,
+              job.id ?? 'notification-job',
+            );
+            return notificationComposition.process(job);
+          },
         ),
       {
         autorun: roleConsumesQueue(role, 'notification'),
@@ -292,6 +323,8 @@ export class WorkerRuntime {
       notificationComposition,
       backtestComposition,
       experimentComposition,
+      recoveryComposition,
+      featureFlags,
       randomUUID(),
     );
 
@@ -304,6 +337,7 @@ export class WorkerRuntime {
         await alertComposition.catchUp(alertQueue);
         await experimentComposition.reconcile(experimentQueue);
         await runtime.enqueueHeartbeat();
+        await runtime.enqueueLifecycleJobs();
         runtime.startHeartbeat();
       }
       await runtime.markReady();
@@ -399,6 +433,12 @@ export class WorkerRuntime {
               error instanceof Error ? error.constructor.name : 'UnknownError',
           });
         });
+      void this.enqueueLifecycleJobs().catch((error: unknown) => {
+        this.logger.error('worker.lifecycle.enqueue-failed', {
+          errorType:
+            error instanceof Error ? error.constructor.name : 'UnknownError',
+        });
+      });
     }, this.environment.WORKER_HEARTBEAT_INTERVAL_MS);
   }
 
@@ -413,6 +453,11 @@ export class WorkerRuntime {
         ),
       },
     );
+  }
+
+  private async enqueueLifecycleJobs(now: Date = new Date()): Promise<void> {
+    for (const job of this.recoveryComposition.scheduledJobs(now))
+      await this.systemQueue.add(job.name, job.data, { jobId: job.id });
   }
 
   private registerWorkerEvents(): void {
@@ -533,6 +578,8 @@ export class WorkerRuntime {
       this.notificationComposition.close(),
       this.backtestComposition.close(),
       this.experimentComposition.close(),
+      this.recoveryComposition.close(),
+      this.featureFlags.close(),
     ]);
   }
 

@@ -80,3 +80,23 @@ groups:
           dedup_key: backtest-terminal-rate
           cooldown: 60m
           recovery_notification: required
+      - alert: AtlasPostgresBackupFailed
+        expr: atlas_backup_status_healthy == 0
+        for: 5m
+        labels:
+          { severity: critical, owner: database-oncall, atlas_group: recovery }
+        annotations:
+          runbook_url: https://runbooks.atlas.invalid/backup-restore
+          dedup_key: postgres-backup-failed
+          cooldown: 15m
+          recovery_notification: required
+      - alert: AtlasRecoveryDrillExpired
+        expr: time() - atlas_recovery_drill_last_pass_timestamp_seconds > 2678400
+        for: 1h
+        labels:
+          { severity: critical, owner: platform-oncall, atlas_group: recovery }
+        annotations:
+          runbook_url: https://runbooks.atlas.invalid/backup-restore
+          dedup_key: recovery-drill-expired
+          cooldown: 6h
+          recovery_notification: required

@@ -110,7 +110,7 @@ describe('PostgreSQL migrations', () => {
     await pool.end();
   });
 
-  it('clean-migrates exactly the seventy domain tables', async () => {
+  it('clean-migrates exactly the seventy-six domain tables', async () => {
     const result = await pool.query<{ table_name: string }>(`
       select table_name
       from information_schema.tables
@@ -119,6 +119,7 @@ describe('PostgreSQL migrations', () => {
     `);
 
     expect(result.rows.map((row) => row.table_name)).toEqual([
+      'account_deletion_requests',
       'alert_evaluations',
       'alert_revisions',
       'alert_states',
@@ -132,6 +133,7 @@ describe('PostgreSQL migrations', () => {
       'backtest_series_chunks',
       'backtest_summaries',
       'backtest_trades',
+      'backup_status_checks',
       'data_providers',
       'data_quality_issues',
       'feature_flag_versions',
@@ -144,6 +146,7 @@ describe('PostgreSQL migrations', () => {
       'ingestion_runs',
       'instrument_symbol_history',
       'instruments',
+      'legal_holds',
       'market_overview_snapshots',
       'market_rank_snapshots',
       'notification_deliveries',
@@ -169,9 +172,11 @@ describe('PostgreSQL migrations', () => {
       'preset_scans',
       'price_bars',
       'provider_instrument_mappings',
+      'recovery_drills',
       'release_records',
       'research_experiment_runs',
       'research_experiments',
+      'retention_job_runs',
       'saved_scan_revisions',
       'saved_scan_tags',
       'saved_scans',
@@ -184,6 +189,7 @@ describe('PostgreSQL migrations', () => {
       'sectors',
       'security_rate_limit_buckets',
       'security_users',
+      'stored_artifacts',
       'strategies',
       'strategy_revisions',
       'watchlist_item_tags',
@@ -921,6 +927,16 @@ describe('PostgreSQL migrations', () => {
   });
 
   it('executes the documented destructive rollback and reapplies forward', async () => {
+    const flagRuntimeRollbackSql = await readFile(
+      resolve(migrationFolder(), 'rollback/0013_feature_flag_types.down.sql'),
+      'utf8',
+    );
+    await pool.query(flagRuntimeRollbackSql);
+    const recoveryRollbackSql = await readFile(
+      resolve(migrationFolder(), 'rollback/0012_recovery_retention.down.sql'),
+      'utf8',
+    );
+    await pool.query(recoveryRollbackSql);
     const securityRollbackSql = await readFile(
       resolve(
         migrationFolder(),
@@ -1045,7 +1061,7 @@ describe('PostgreSQL migrations', () => {
       where created_at in (
         select created_at from drizzle.__drizzle_migrations
         order by created_at desc
-        limit 10
+        limit 12
       )
     `);
     await runMigrations(db);

@@ -1,0 +1,40 @@
+apiVersion: atlas.project/v1
+kind: RecoveryCapabilityPolicy
+metadata:
+  name: production-recovery-v1
+spec:
+  postgresql:
+    automatedBackup: true
+    encryptionAtRest: required
+    encryptionInTransit: required
+    pitr:
+      enabled: true
+      maximumArchiveIntervalSeconds: 900
+    retentionDays: 35
+    failureDomain: separate-from-primary
+    restoreCredential: atlas-restore-secrets
+    runtimeCredential: atlas-runtime-secrets
+    statusCheckMaximumAgeSeconds: 3600
+  recoveryDrill:
+    environment: recovery
+    intervalDays: 30
+    rpoTargetSeconds: 900
+    rtoTargetSeconds: 7200
+    isolatedNamespaceRequired: true
+    cleanupRequired: true
+  objectStorage:
+    checksum: sha256
+    encryption: provider-managed-kms
+    lifecyclePolicyVersion: artifact-retention-v1
+    objectLockSupported: true
+    restoreSamplingRequired: true
+    versioning: true
+  redis:
+    authoritative: false
+    recoverySource: postgresql
+    reconciliationRequired: true
+  retention:
+    operationalLogs:
+      backendManaged: true
+      retentionDays: 30
+    policyVersion: retention-v1

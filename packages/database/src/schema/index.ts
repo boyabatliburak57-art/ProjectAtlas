@@ -5,5 +5,6 @@ export * from './operations';
 export * from './security';
 export * from './market-data';
 export * from './portfolio-transactions-risk';
+export * from './recovery';
 export * from './scanner-runtime';
 export * from './strategies-backtests-experiments';

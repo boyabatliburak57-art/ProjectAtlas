@@ -75,6 +75,7 @@ jobs:
         run: |
           pnpm config:check
           pnpm deploy:validate
+          pnpm recovery:validate
 
       - name: Observability provisioning and synthetic contract
         run: |

@@ -1,0 +1,11 @@
+{
+  "status": "PASS",
+  "adapter": "encrypted-filesystem-v1",
+  "versioning": "PASS",
+  "encryption": "AES-256-GCM",
+  "checksum": "b704109aafb39a705521900caa8a146bb48bd9eb327bd583f04682d8f041a0f0",
+  "checksumValidation": "PASS",
+  "restore": "PASS",
+  "lifecycle": "PASS",
+  "orphanCleanup": "PASS"
+}

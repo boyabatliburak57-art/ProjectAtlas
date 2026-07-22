@@ -16,6 +16,7 @@ const navigation = [
   { href: '/watchlists', label: 'Listeler' },
   { href: '/alerts', label: 'Alarmlar' },
   { href: '/notifications', label: 'Bildirimler' },
+  { href: '/admin/operations', label: 'Operasyonlar' },
 ] as const;
 
 export function AtlasShell({ children }: { readonly children: ReactNode }) {

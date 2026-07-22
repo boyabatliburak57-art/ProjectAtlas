@@ -19,12 +19,28 @@ export const ATLAS_JOB_NAMES = {
   barIngestion: 'market-data.bar-ingestion.v1',
   deadLetter: 'system.dead-letter.v1',
   heartbeat: 'system.heartbeat.v1',
+  retentionRun: 'system.retention.run.v1',
+  accountDeletionReconcile: 'system.account-deletion.reconcile.v1',
   instrumentSync: 'market-data.instrument-sync.v1',
   fundamentalsIngest: 'market-data.fundamentals-ingest.v1',
   patternsDetect: 'market-data.patterns-detect.v1',
   marketIntelligenceReconcile: 'market-data.intelligence-reconcile.v1',
   scannerRun: 'scanner.run.v1',
 } as const;
+
+export interface RetentionRunQueuePayload {
+  readonly category:
+    | 'notifications'
+    | 'scan_details'
+    | 'backtest_details'
+    | 'exports'
+    | 'import_files'
+    | 'operational_logs'
+    | 'audit_records'
+    | 'incidents'
+    | 'deleted_accounts';
+  readonly executionKey: string;
+}
 
 export type MarketIntelligenceInvalidationType =
   | 'new_closed_bar'

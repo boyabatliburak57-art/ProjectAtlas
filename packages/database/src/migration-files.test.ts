@@ -15,8 +15,8 @@ function migrationSql(): string {
 describe('generated PostgreSQL migrations', () => {
   const sql = migrationSql();
 
-  it('creates the seventy scoped tables and current revision view', () => {
-    expect(sql.match(/CREATE TABLE/g)).toHaveLength(70);
+  it('creates the seventy-six scoped tables and current revision view', () => {
+    expect(sql.match(/CREATE TABLE/g)).toHaveLength(76);
     expect(sql).toContain('CREATE VIEW "public"."current_price_bars"');
   });
 
@@ -197,5 +197,28 @@ describe('generated PostgreSQL migrations', () => {
     );
     expect(sql).toContain('prevent_immutable_operational_record_mutation');
     expect(sql).toContain('release_records_digest_check');
+    expect(sql).toContain('scanner.new-runs.disabled');
+    expect(sql).toContain('patterns.refresh.disabled');
+    expect(sql).toContain("'entitlement', 'maintenance'");
+  });
+
+  it('contains recovery, retention, legal hold and deletion guards', () => {
+    for (const table of [
+      'backup_status_checks',
+      'recovery_drills',
+      'retention_job_runs',
+      'legal_holds',
+      'stored_artifacts',
+      'account_deletion_requests',
+    ])
+      expect(sql).toContain(`CREATE TABLE "${table}"`);
+
+    expect(sql).toContain('backup_status_environment_reference_unique');
+    expect(sql).toContain('retention_job_runs_execution_key_unique');
+    expect(sql).toContain('stored_artifacts_object_version_unique');
+    expect(sql).toContain('account_deletion_requests_idempotency_unique');
+    expect(sql).toContain('recovery_drills_terminal_immutable');
+    expect(sql).toContain("current_setting('atlas.retention_purge', true)");
+    expect(sql).toContain('retention_job_runs_terminal_immutable');
   });
 });

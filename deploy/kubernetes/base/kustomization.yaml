@@ -15,6 +15,7 @@ resources:
   - worker-experiment.yaml
   - worker-scheduled.yaml
   - migration-job.yaml
+  - recovery.yaml
   - ingress.yaml
   - network-policies.yaml
   - autoscaling.yaml

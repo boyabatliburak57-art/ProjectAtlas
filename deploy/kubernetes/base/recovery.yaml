@@ -1,0 +1,129 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: atlas-recovery
+automountServiceAccountToken: false
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: atlas-backup-status-monitor
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 7
+  schedule: '*/15 * * * *'
+  successfulJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 300
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: atlas-backup-status-monitor
+            app.kubernetes.io/part-of: project-atlas
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          serviceAccountName: atlas-recovery
+          containers:
+            - name: monitor
+              image: ghcr.io/project-atlas/worker@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              command:
+                [node, apps/worker/dist/recovery/backup-status-monitor.js]
+              envFrom:
+                - configMapRef: { name: atlas-runtime-config }
+                - secretRef: { name: atlas-restore-secrets }
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { cpu: 250m, memory: 256Mi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: { drop: [ALL] }
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                runAsUser: 1000
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: atlas-recovery-gate-template
+spec:
+  concurrencyPolicy: Forbid
+  schedule: '0 0 1 1 *'
+  suspend: true
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 300
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: atlas-recovery-gate
+            app.kubernetes.io/part-of: project-atlas
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          serviceAccountName: atlas-recovery
+          containers:
+            - name: gate
+              image: ghcr.io/project-atlas/migration@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              command:
+                [node, packages/database/dist/src/cli/verify-recovery-gate.js]
+              env:
+                - { name: RESTORE_DRILL_ID, value: required-at-release }
+                - { name: RESTORE_DRILL_MAX_AGE_DAYS, value: '31' }
+              envFrom:
+                - configMapRef: { name: atlas-runtime-config }
+                - secretRef: { name: atlas-restore-secrets }
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { cpu: 250m, memory: 256Mi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: { drop: [ALL] }
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                runAsUser: 1000
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: atlas-restore-drill-template
+spec:
+  concurrencyPolicy: Forbid
+  schedule: '0 0 1 1 *'
+  suspend: true
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 7200
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: atlas-restore-drill
+            app.kubernetes.io/part-of: project-atlas
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          serviceAccountName: atlas-recovery
+          containers:
+            - name: drill
+              image: ghcr.io/project-atlas/migration@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              command: [node, packages/database/dist/src/cli/restore-drill.js]
+              env:
+                - { name: RECOVERY_ENVIRONMENT, value: recovery }
+                - { name: RECOVERY_RPO_TARGET_SECONDS, value: '900' }
+                - { name: RECOVERY_RTO_TARGET_SECONDS, value: '7200' }
+              envFrom:
+                - configMapRef: { name: atlas-runtime-config }
+                - secretRef: { name: atlas-restore-secrets }
+              resources:
+                requests: { cpu: 500m, memory: 512Mi }
+                limits: { cpu: '2', memory: 2Gi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: { drop: [ALL] }
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                runAsUser: 1000

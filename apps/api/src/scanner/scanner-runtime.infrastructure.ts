@@ -47,7 +47,7 @@ import { FallbackScannerRuntimeReader } from './scanner-progress';
 @Injectable()
 export class ApiDatabase implements OnApplicationShutdown {
   readonly database: Database;
-  private readonly pool: ReturnType<typeof createDatabase>['pool'];
+  readonly pool: ReturnType<typeof createDatabase>['pool'];
 
   constructor(
     @Inject(ConfigService) config: ConfigService,

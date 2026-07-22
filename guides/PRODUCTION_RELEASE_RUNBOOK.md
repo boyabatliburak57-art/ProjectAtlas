@@ -24,15 +24,21 @@
 ## Production
 
 1. release record create
-2. backup status verify
-3. migration compatibility
-4. controlled rollout
-5. readiness and error budget
-6. synthetic tests
-7. queue/worker validation
-8. data freshness
-9. feature flag rollout
-10. completion record
+2. encrypted backup/PITR status ve ayrı failure domain doğrula
+3. son 31 gün içinde geçmiş, cleanup'ı tamamlanmış restore drill ID'sini seç
+4. persisted drill RPO <= 15 dakika, RTO <= 120 dakika ve application smoke PASS gate'ini çalıştır
+5. migration compatibility
+6. controlled rollout
+7. readiness and error budget
+8. synthetic tests
+9. queue/worker validation
+10. data freshness
+11. feature flag rollout
+12. completion record
+
+Restore drill veya backup status geçmezse rollout başlamaz. Runtime database credential'ı restore
+credential'ı olarak kullanılamaz. Ayrıntılı prosedür `BACKUP_RESTORE_AND_RETENTION_RUNBOOK.md`
+dosyasındadır.
 
 ## Rollback triggerleri
 

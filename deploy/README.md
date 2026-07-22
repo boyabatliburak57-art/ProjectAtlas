@@ -88,3 +88,17 @@ best-effort telemetry üretir, PostgreSQL iş state'i authoritative kalır. Metr
 user/resource/symbol/run kimliklerini reddeder. Staging release, dedicated synthetic identity ile
 health, session, market, scanner, portfolio ve backtest journey kontrollerini tamamlamadan release
 record üretmez.
+
+## Backup ve recovery adapter'ı
+
+`deploy/recovery/capabilities.yaml` managed PostgreSQL backup/PITR, ayrı failure domain, KMS
+encryption, 35 günlük retention ve object storage versioning sözleşmesini tanımlar. Platform adapter
+bu capability'leri sağlamadan production-ready sayılmaz. Uygulamanın `atlas-runtime-secrets`
+credential'ı restore yetkisi taşımaz; yalnız `atlas-recovery` service account'u
+`atlas-restore-secrets` ile restore doğrulaması yapabilir.
+
+`recovery.yaml` backup status monitorünü ve bilinçli olarak suspend edilmiş recovery gate/restore
+drill şablonlarını içerir. Production workflow migration veya rollout öncesinde kullanıcı tarafından
+verilen drill ID'sini PostgreSQL'deki immutable recovery kanıtına karşı doğrular. Provider'a özel
+restore, replica ve object lifecycle implementasyonu bu sözleşmenin adapter noktasıdır; manifestler
+gerçek production restore veya deploy'u kendiliğinden başlatmaz.

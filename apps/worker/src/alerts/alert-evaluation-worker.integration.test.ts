@@ -114,6 +114,18 @@ describe('alert evaluation BullMQ runtime', () => {
     await queue.waitUntilReady();
     await queueEvents.waitUntilReady();
     await queue.obliterate({ force: true });
+    await pool.query(`
+      insert into feature_flag_versions
+        (flag_id, version, environment, enabled, targeting_rules, reason, changed_by)
+      select id, 1, 'local', false, '{}'::jsonb,
+             'Integration fixture safe state',
+             '00000000-0000-4000-8000-000000000000'::uuid
+      from feature_flags where key = 'alerts.evaluation.disabled'
+      on conflict do nothing
+    `);
+    await (
+      await queue.client
+    ).del('atlas:feature-flags:v1:local:alerts.evaluation.disabled');
 
     providerId = (
       await db
@@ -191,6 +203,7 @@ describe('alert evaluation BullMQ runtime', () => {
       sourceConfiguration: {},
       channels: ['in_app'],
       createdBy: ownerId,
+      createdAt: new Date('2026-07-01T00:00:00.000Z'),
     });
     runtime = await startRuntime();
   });
@@ -319,6 +332,26 @@ describe('alert evaluation BullMQ runtime', () => {
         ),
       );
     expect(trigger).toHaveLength(2);
+  }, 15_000);
+
+  it('enforces the alert kill switch at the production worker boundary', async () => {
+    await pool.query(`
+      insert into feature_flag_versions
+        (flag_id, version, environment, enabled, targeting_rules, reason, changed_by)
+      select id, 2, 'local', true, '{}'::jsonb,
+             'Worker boundary integration test',
+             '00000000-0000-4000-8000-000000000000'::uuid
+      from feature_flags where key = 'alerts.evaluation.disabled'
+    `);
+    const redis = await queue.client;
+    await redis.del('atlas:feature-flags:v1:local:alerts.evaluation.disabled');
+    const event = await insertBarEvent(150, '2026-07-20T07:00:00.000Z');
+    const job = await enqueueAlertEvaluation(queue, event, { attempts: 1 });
+
+    await expect(job.waitUntilFinished(queueEvents, 10_000)).rejects.toThrow(
+      'WORKER_KILL_SWITCH_ENABLED',
+    );
+    expect(await evaluationCount(oncePerBarAlertId, event.eventId)).toBe(0);
   });
 
   async function startRuntime(): Promise<WorkerRuntime> {

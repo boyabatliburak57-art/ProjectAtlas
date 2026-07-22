@@ -27,6 +27,7 @@ import { hashPassword } from './security-crypto';
 
 const regularUserId = '00000000-0000-4000-8000-000000007501';
 const adminUserId = '00000000-0000-4000-8000-000000007502';
+const deletionUserId = '00000000-0000-4000-8000-000000007503';
 const password = 'Secure-Password-2026!';
 
 describe('production security authority', () => {
@@ -55,10 +56,17 @@ describe('production security authority', () => {
         passwordHash,
         roles: ['operations_admin'],
       },
+      {
+        email: 'deletion@example.test',
+        id: deletionUserId,
+        normalizedEmail: 'deletion@example.test',
+        passwordHash,
+        roles: [],
+      },
     ]);
     const module = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(ApiDatabase)
-      .useValue({ database: db })
+      .useValue({ database: db, pool })
       .compile();
     application = module.createNestApplication({ logger: false });
     configureApplication(application);
@@ -344,6 +352,91 @@ describe('production security authority', () => {
     expect(body.data.items.length).toBeGreaterThanOrEqual(3);
   });
 
+  it('enforces optimistic flag versions and a kill switch on the real backtest create path', async () => {
+    const admin = await sessions.login(
+      { email: 'admin@example.test', password },
+      { ip: '127.0.0.1', userAgent: 'feature-flag-test' },
+    );
+    const user = await sessions.login(
+      {
+        email: 'regular@example.test',
+        password: 'New-Secure-Password-2026!',
+      },
+      { ip: '127.0.0.1', userAgent: 'feature-flag-test' },
+    );
+    const server = application.getHttpServer() as Server;
+    await request(server)
+      .post('/api/v1/admin/feature-flags/backtests.creation.disabled/versions')
+      .set('authorization', `Bearer ${admin.token}`)
+      .send({
+        confirmation: 'CONFIRM_OPERATIONAL_CHANGE',
+        enabled: true,
+        environment: 'test',
+        expectedVersion: 0,
+        reason: 'Reject stale operations version',
+      })
+      .expect(409);
+    await request(server)
+      .post('/api/v1/backtests')
+      .set('authorization', `Bearer ${user.token}`)
+      .set('idempotency-key', 'task-077-cache-prewarm')
+      .send({})
+      .expect(400);
+    await request(server)
+      .post('/api/v1/admin/feature-flags/backtests.creation.disabled/versions')
+      .set('authorization', `Bearer ${admin.token}`)
+      .send({
+        confirmation: 'CONFIRM_OPERATIONAL_CHANGE',
+        enabled: true,
+        environment: 'test',
+        expectedVersion: 1,
+        reason: 'Incident mitigation test switch',
+      })
+      .expect(201);
+    await request(server)
+      .post('/api/v1/backtests')
+      .set('authorization', `Bearer ${user.token}`)
+      .set('idempotency-key', 'task-077-kill-switch-path')
+      .send({})
+      .expect(503);
+    const history = await request(server)
+      .get('/api/v1/admin/feature-flags/backtests.creation.disabled/history')
+      .set('authorization', `Bearer ${admin.token}`)
+      .expect(200);
+    const historyBody = history.body as {
+      data: { flag: { id: string }; versions: readonly unknown[] };
+    };
+    expect(historyBody.data.versions).toHaveLength(2);
+    const flagAudits = await db
+      .select()
+      .from(operationalAuditEvents)
+      .where(eq(operationalAuditEvents.resourceId, historyBody.data.flag.id));
+    const enabledAudit = flagAudits.find(
+      (event) => event.action === 'feature_flag.enable',
+    );
+    expect(enabledAudit).toMatchObject({
+      action: 'feature_flag.enable',
+      actorUserId: adminUserId,
+      reason: 'Incident mitigation test switch',
+      resourceType: 'feature_flag',
+    });
+    expect(enabledAudit?.afterState).not.toBeNull();
+    expect(enabledAudit?.beforeState).not.toBeNull();
+    expect(enabledAudit?.correlationId).toBeTruthy();
+    expect(enabledAudit?.requestId).toBeTruthy();
+    await request(server)
+      .post('/api/v1/admin/feature-flags/backtests.creation.disabled/versions')
+      .set('authorization', `Bearer ${admin.token}`)
+      .send({
+        confirmation: 'CONFIRM_OPERATIONAL_CHANGE',
+        enabled: false,
+        environment: 'test',
+        expectedVersion: 2,
+        reason: 'Restore safe test state',
+      })
+      .expect(201);
+  });
+
   it('enforces shared IP rate limits with Retry-After', async () => {
     await db.delete(securityRateLimitBuckets);
     const middleware = new AbusePreventionMiddleware(
@@ -471,6 +564,35 @@ describe('production security authority', () => {
       expect(row.ipHash).toMatch(/^[a-f0-9]{64}$/u);
       expect(row.userAgentHash).toMatch(/^[a-f0-9]{64}$/u);
     }
+  });
+
+  it('disables only the authenticated account and rejects deletion IDOR input', async () => {
+    const issued = await sessions.login(
+      { email: 'deletion@example.test', password },
+      { ip: '127.0.0.1', userAgent: 'deletion-security-test' },
+    );
+    await request(application.getHttpServer() as Server)
+      .post('/api/v1/account/deletion')
+      .set('authorization', `Bearer ${issued.token}`)
+      .send({
+        idempotencyKey: 'account-deletion-security-076',
+        targetUserId: adminUserId,
+      })
+      .expect(201);
+    const users = await db
+      .select()
+      .from(securityUsers)
+      .where(eq(securityUsers.id, deletionUserId));
+    expect(users[0]?.accountStatus).toBe('disabled');
+    const admins = await db
+      .select()
+      .from(securityUsers)
+      .where(eq(securityUsers.id, adminUserId));
+    expect(admins[0]?.accountStatus).toBe('active');
+    await request(application.getHttpServer() as Server)
+      .post('/api/v1/account/deletion')
+      .send({ idempotencyKey: 'unauthenticated-deletion-076' })
+      .expect(401);
   });
 });
 

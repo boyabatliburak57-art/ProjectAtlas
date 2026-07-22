@@ -7,6 +7,7 @@ import {
   Headers,
   HttpCode,
   Inject,
+  Optional,
   Param,
   Patch,
   Post,
@@ -31,6 +32,10 @@ import {
   type AuthenticatedUserResolver,
 } from '../common/auth/authenticated-user';
 import { getRequestId } from '../common/http/request-context';
+import {
+  FeatureFlagRuntimeService,
+  KILL_SWITCHES,
+} from '../operations/feature-flag-runtime.service';
 import {
   ApiDataResponseDto,
   BacktestSummaryResponseDto,
@@ -161,6 +166,7 @@ export class BacktestsController {
     private readonly service: BacktestsService,
     @Inject(AUTHENTICATED_USER_RESOLVER)
     private readonly auth: AuthenticatedUserResolver,
+    @Optional() private readonly flags?: FeatureFlagRuntimeService,
   ) {}
 
   @Post()
@@ -174,11 +180,11 @@ export class BacktestsController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() body: BacktestCreateDto,
   ) {
-    const result = await this.service.create(
-      this.user(request),
-      idempotencyKey,
-      body,
-    );
+    const userId = this.user(request);
+    await this.flags?.assertWriteAllowed(KILL_SWITCHES.backtestCreation, {
+      userId,
+    });
+    const result = await this.service.create(userId, idempotencyKey, body);
     response.status(result.replayed ? 200 : 201);
     return {
       data: result.run,
@@ -285,6 +291,7 @@ export class ExperimentsController {
     private readonly service: ExperimentsService,
     @Inject(AUTHENTICATED_USER_RESOLVER)
     private readonly auth: AuthenticatedUserResolver,
+    @Optional() private readonly flags?: FeatureFlagRuntimeService,
   ) {}
   @Get() async list(@Req() request: Request) {
     return this.response(request, {
@@ -295,10 +302,11 @@ export class ExperimentsController {
     @Req() request: Request,
     @Body() body: ExperimentCreateDto,
   ) {
-    return this.response(
-      request,
-      await this.service.create(this.user(request), body),
-    );
+    const userId = this.user(request);
+    await this.flags?.assertWriteAllowed(KILL_SWITCHES.experimentCreation, {
+      userId,
+    });
+    return this.response(request, await this.service.create(userId, body));
   }
   @Get(':id')
   @ApiForbiddenResponse({ description: 'Experiment ownership denied' })
@@ -341,6 +349,10 @@ export class ExperimentsController {
     @Res() response: Response,
     @Param('id') id: string,
   ) {
+    await this.flags?.assertWriteAllowed(KILL_SWITCHES.exports, {
+      resourceId: id,
+      userId: this.user(request),
+    });
     const csv = await this.service.export(this.user(request), id);
     response
       .status(200)

@@ -4,6 +4,7 @@ import {
   Get,
   Headers,
   Inject,
+  Optional,
   Param,
   Post,
   Query,
@@ -26,6 +27,10 @@ import {
   type AuthenticatedUserResolver,
 } from '../common/auth/authenticated-user';
 import { getCorrelationId, getRequestId } from '../common/http/request-context';
+import {
+  FeatureFlagRuntimeService,
+  KILL_SWITCHES,
+} from '../operations/feature-flag-runtime.service';
 import { ScanRunResponseDto } from '../scanner/scanner-runtime.dto';
 import { PresetScansService } from './preset-scans.service';
 
@@ -36,6 +41,7 @@ export class PresetScansController {
     private readonly presets: PresetScansService,
     @Inject(AUTHENTICATED_USER_RESOLVER)
     private readonly authenticatedUser: AuthenticatedUserResolver,
+    @Optional() private readonly flags?: FeatureFlagRuntimeService,
   ) {}
 
   @Get('preset-scan-categories')
@@ -82,8 +88,13 @@ export class PresetScansController {
     @Param('code') code: string,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
   ): Promise<ScanRunResponseDto> {
+    const userId = this.authenticatedUser(request);
+    await this.flags?.assertWriteAllowed(KILL_SWITCHES.scannerCreation, {
+      resourceId: code,
+      userId,
+    });
     const result = await this.presets.run(
-      this.authenticatedUser(request),
+      userId,
       code,
       idempotencyKey,
       getCorrelationId(request),

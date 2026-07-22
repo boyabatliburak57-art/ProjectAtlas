@@ -72,9 +72,35 @@ import {
   releaseRecords,
   securityRateLimitBuckets,
   securityUsers,
+  accountDeletionRequests,
+  backupStatusChecks,
+  legalHolds,
+  recoveryDrills,
+  retentionJobRuns,
+  storedArtifacts,
 } from './index';
 
 describe('initial database schema', () => {
+  it('exports the six recovery and retention tables', () => {
+    expect(
+      [
+        backupStatusChecks,
+        recoveryDrills,
+        retentionJobRuns,
+        legalHolds,
+        storedArtifacts,
+        accountDeletionRequests,
+      ].map(getTableName),
+    ).toEqual([
+      'backup_status_checks',
+      'recovery_drills',
+      'retention_job_runs',
+      'legal_holds',
+      'stored_artifacts',
+      'account_deletion_requests',
+    ]);
+  });
+
   it('contains only the eight TASK-007 tables', () => {
     expect(
       [
