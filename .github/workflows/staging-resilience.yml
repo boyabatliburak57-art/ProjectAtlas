@@ -1,0 +1,136 @@
+name: Staging Load and Chaos Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Mandatory staging scenario or all scenarios in one class
+        options:
+          - read-load
+          - mixed
+          - soak
+          - load-all
+          - redis-restart
+          - worker-kill
+          - postgres-interruption
+          - object-storage
+          - rollback
+          - stale-market-data
+          - chaos-all
+        required: true
+        type: choice
+      confirmation:
+        description: Type APPROVE_STAGING_RESILIENCE
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-staging-resilience
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: inputs.confirmation == 'APPROVE_STAGING_RESILIENCE'
+    environment: staging
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.4 --activate
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Materialize operator-owned staging contracts
+        env:
+          CHAOS_ADAPTER: ${{ secrets.STAGING_CHAOS_ADAPTER_JSON }}
+          RESILIENCE_FIXTURE: ${{ secrets.STAGING_RESILIENCE_FIXTURE_JSON }}
+        run: |
+          test -n "$RESILIENCE_FIXTURE"
+          mkdir -p performance/fixtures deploy/chaos
+          printf '%s' "$RESILIENCE_FIXTURE" > performance/fixtures/production-staging-v1.json
+          if [ -n "$CHAOS_ADAPTER" ]; then
+            printf '%s' "$CHAOS_ADAPTER" > deploy/chaos/staging-adapter.json
+          fi
+          chmod 600 performance/fixtures/production-staging-v1.json
+          test ! -f deploy/chaos/staging-adapter.json || chmod 600 deploy/chaos/staging-adapter.json
+
+      - name: Validate immutable contracts
+        run: |
+          pnpm resilience:validate
+          pnpm test:resilience
+
+      - name: Configure staging Kubernetes adapter
+        if: contains(inputs.scenario, 'restart') || contains(inputs.scenario, 'kill') || inputs.scenario == 'postgres-interruption' || inputs.scenario == 'object-storage' || inputs.scenario == 'rollback' || inputs.scenario == 'stale-market-data' || inputs.scenario == 'chaos-all'
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG_STAGING }}
+        run: |
+          test -n "$KUBE_CONFIG"
+          mkdir -p "$HOME/.kube"
+          printf '%s' "$KUBE_CONFIG" | base64 --decode > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Run load scenario
+        if: inputs.scenario == 'read-load' || inputs.scenario == 'mixed' || inputs.scenario == 'soak' || inputs.scenario == 'load-all'
+        env:
+          ATLAS_LOAD_ALERT_PAYLOAD: ${{ vars.STAGING_LOAD_ALERT_PAYLOAD }}
+          ATLAS_LOAD_ALERT_EVALUATION_URL: ${{ vars.STAGING_LOAD_ALERT_EVALUATION_URL }}
+          ATLAS_LOAD_BACKTEST_PAYLOAD: ${{ vars.STAGING_LOAD_BACKTEST_PAYLOAD }}
+          ATLAS_LOAD_EXPERIMENT_PAYLOAD: ${{ vars.STAGING_LOAD_EXPERIMENT_PAYLOAD }}
+          ATLAS_LOAD_METRICS_TOKEN: ${{ secrets.STAGING_METRICS_BEARER_TOKEN }}
+          ATLAS_LOAD_OPERATIONS_TOKEN: ${{ secrets.STAGING_OPERATIONS_BEARER_TOKEN }}
+          ATLAS_LOAD_PRIMARY_TOKEN: ${{ secrets.STAGING_LOAD_PRIMARY_TOKEN }}
+          ATLAS_LOAD_RECALCULATE_PAYLOAD: ${{ vars.STAGING_LOAD_RECALCULATE_PAYLOAD }}
+          ATLAS_LOAD_SCANNER_PAYLOAD: ${{ vars.STAGING_LOAD_SCANNER_PAYLOAD }}
+          ATLAS_LOAD_SECONDARY_TOKEN: ${{ secrets.STAGING_LOAD_SECONDARY_TOKEN }}
+        run: |
+          scenario="${{ inputs.scenario }}"
+          test "$scenario" != load-all || scenario=all
+          pnpm perf:production --scenario "$scenario"
+
+      - name: Run chaos scenario
+        if: contains(inputs.scenario, 'restart') || contains(inputs.scenario, 'kill') || inputs.scenario == 'postgres-interruption' || inputs.scenario == 'object-storage' || inputs.scenario == 'rollback' || inputs.scenario == 'stale-market-data' || inputs.scenario == 'chaos-all'
+        env:
+          ATLAS_LOAD_ALERT_PAYLOAD: ${{ vars.STAGING_LOAD_ALERT_PAYLOAD }}
+          ATLAS_LOAD_ALERT_EVALUATION_URL: ${{ vars.STAGING_LOAD_ALERT_EVALUATION_URL }}
+          ATLAS_LOAD_BACKTEST_PAYLOAD: ${{ vars.STAGING_LOAD_BACKTEST_PAYLOAD }}
+          ATLAS_LOAD_EXPERIMENT_PAYLOAD: ${{ vars.STAGING_LOAD_EXPERIMENT_PAYLOAD }}
+          ATLAS_LOAD_METRICS_TOKEN: ${{ secrets.STAGING_METRICS_BEARER_TOKEN }}
+          ATLAS_LOAD_OPERATIONS_TOKEN: ${{ secrets.STAGING_OPERATIONS_BEARER_TOKEN }}
+          ATLAS_LOAD_PRIMARY_TOKEN: ${{ secrets.STAGING_LOAD_PRIMARY_TOKEN }}
+          ATLAS_LOAD_RECALCULATE_PAYLOAD: ${{ vars.STAGING_LOAD_RECALCULATE_PAYLOAD }}
+          ATLAS_LOAD_SCANNER_PAYLOAD: ${{ vars.STAGING_LOAD_SCANNER_PAYLOAD }}
+          ATLAS_LOAD_SECONDARY_TOKEN: ${{ secrets.STAGING_LOAD_SECONDARY_TOKEN }}
+          ATLAS_STAGING_CHAOS_APPROVAL: TASK-078-STAGING-ONLY
+        run: |
+          scenario="${{ inputs.scenario }}"
+          test "$scenario" != chaos-all || scenario=all
+          pnpm chaos:staging --scenario "$scenario"
+
+      - name: Remove materialized contracts
+        if: always()
+        run: |
+          rm -f performance/fixtures/production-staging-v1.json
+          rm -f deploy/chaos/staging-adapter.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: staging-resilience-${{ inputs.scenario }}-${{ github.run_id }}
+          path: |
+            reports/performance/production-load.json
+            reports/performance/production-load.md
+            reports/resilience/staging-chaos.json
+            reports/resilience/staging-chaos.md
+          retention-days: 90

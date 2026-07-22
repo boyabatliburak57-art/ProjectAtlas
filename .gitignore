@@ -11,3 +11,5 @@ node_modules/
 *.tsbuildinfo
 test-results/
 reports/security/
+deploy/chaos/staging-adapter.json
+performance/fixtures/production-staging-v1.json

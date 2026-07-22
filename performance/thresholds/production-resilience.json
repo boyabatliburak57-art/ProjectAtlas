@@ -1,0 +1,53 @@
+{
+  "policyVersion": "production-resilience-v1",
+  "readLoad": {
+    "minimumDurationSeconds": 60,
+    "minimumConcurrency": 12,
+    "maximumErrorRate": 0.01,
+    "routes": {
+      "marketOverview": { "p95Ms": 500, "source": "PERF-MKT-001 warm" },
+      "symbolDetail": { "p95Ms": 700, "source": "PERF-MKT-003" },
+      "symbolChart": { "p95Ms": 900, "source": "PERF-MKT-004" },
+      "scannerResults": { "p95Ms": 300, "source": "PERF-SCN-004" },
+      "watchlistMarketSummary": { "p95Ms": 750, "source": "PERF-AWN-005" },
+      "portfolioPositions": { "p95Ms": 500, "source": "PERF-PORT-006" },
+      "backtestSummary": { "p95Ms": 500, "source": "PERF-BT-004-summary" },
+      "backtestTrades": { "p95Ms": 500, "source": "PERF-BT-004-trades" }
+    }
+  },
+  "mixed": {
+    "minimumDurationSeconds": 300,
+    "minimumConcurrency": 12,
+    "maximumErrorRate": 0.01,
+    "maximumQueueLagMs": 60000,
+    "maximumQueueRecoverySeconds": 120,
+    "maximumDbPoolUtilization": 0.9,
+    "maximumDbPoolWaiting": 0,
+    "maximumCancellationP95Ms": 5000
+  },
+  "soak": {
+    "minimumDurationSeconds": 14400,
+    "minimumConcurrency": 12,
+    "maximumErrorRate": 0.01,
+    "maximumLatencyDriftRatio": 0.2,
+    "maximumMemoryGrowthRatio": 0.1,
+    "maximumConnectionGrowthRatio": 0.05,
+    "maximumCacheGrowthRatio": 0.2,
+    "maximumFileDescriptorGrowthRatio": 0.05,
+    "maximumQueueLagMs": 60000
+  },
+  "chaos": {
+    "maximumErrorRate": 0.01,
+    "maximumRecoverySeconds": {
+      "redis-restart": 120,
+      "worker-kill": 180,
+      "postgres-interruption": 180,
+      "object-storage": 180,
+      "rollback": 300,
+      "stale-market-data": 120
+    },
+    "maximumDurableLoss": 0,
+    "maximumDuplicateResults": 0,
+    "maximumInvariantFailures": 0
+  }
+}

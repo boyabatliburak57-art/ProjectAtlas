@@ -1,0 +1,119 @@
+{
+  "adapterVersion": "atlas-staging-chaos-v1",
+  "environment": "staging",
+  "context": "replace-with-staging-kube-context",
+  "namespace": "atlas-staging",
+  "allowedExecutables": [
+    "kubectl",
+    "replace-with-approved-staging-postgres-adapter",
+    "replace-with-approved-staging-object-adapter",
+    "replace-with-approved-staging-rollout-adapter",
+    "replace-with-approved-staging-fixture-adapter"
+  ],
+  "scenarios": {
+    "redis-restart": {
+      "fault": [
+        "kubectl",
+        "--context",
+        "{context}",
+        "-n",
+        "{namespace}",
+        "rollout",
+        "restart",
+        "statefulset/staging-redis-adapter"
+      ],
+      "recovery": [
+        "kubectl",
+        "--context",
+        "{context}",
+        "-n",
+        "{namespace}",
+        "rollout",
+        "status",
+        "statefulset/staging-redis-adapter",
+        "--timeout=120s"
+      ]
+    },
+    "worker-kill": {
+      "fault": [
+        "kubectl",
+        "--context",
+        "{context}",
+        "-n",
+        "{namespace}",
+        "delete",
+        "pod",
+        "-l",
+        "app.kubernetes.io/name=atlas-backtest-worker",
+        "--wait=false"
+      ],
+      "recovery": [
+        "kubectl",
+        "--context",
+        "{context}",
+        "-n",
+        "{namespace}",
+        "rollout",
+        "status",
+        "deployment/atlas-backtest-worker",
+        "--timeout=180s"
+      ]
+    },
+    "postgres-interruption": {
+      "fault": [
+        "replace-with-approved-staging-postgres-adapter",
+        "interrupt",
+        "--environment",
+        "staging"
+      ],
+      "recovery": [
+        "replace-with-approved-staging-postgres-adapter",
+        "restore-connectivity",
+        "--environment",
+        "staging"
+      ]
+    },
+    "object-storage": {
+      "fault": [
+        "replace-with-approved-staging-object-adapter",
+        "deny-temporarily",
+        "--environment",
+        "staging"
+      ],
+      "recovery": [
+        "replace-with-approved-staging-object-adapter",
+        "restore",
+        "--environment",
+        "staging"
+      ]
+    },
+    "rollback": {
+      "fault": [
+        "replace-with-approved-staging-rollout-adapter",
+        "deploy-bad-canary",
+        "--environment",
+        "staging"
+      ],
+      "recovery": [
+        "replace-with-approved-staging-rollout-adapter",
+        "rollback",
+        "--environment",
+        "staging"
+      ]
+    },
+    "stale-market-data": {
+      "fault": [
+        "replace-with-approved-staging-fixture-adapter",
+        "freeze-market-data",
+        "--environment",
+        "staging"
+      ],
+      "recovery": [
+        "replace-with-approved-staging-fixture-adapter",
+        "resume-market-data",
+        "--environment",
+        "staging"
+      ]
+    }
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "fixtureVersion": "production-staging-v1",
+  "environment": "staging",
+  "baseUrl": "https://api.staging.atlas.example",
+  "webBaseUrl": "https://staging.atlas.example",
+  "imageDigest": "sha256:replace-with-deployed-image-digest",
+  "auth": {
+    "primaryTokenEnv": "ATLAS_LOAD_PRIMARY_TOKEN",
+    "secondaryTokenEnv": "ATLAS_LOAD_SECONDARY_TOKEN",
+    "operationsTokenEnv": "ATLAS_LOAD_OPERATIONS_TOKEN",
+    "metricsTokenEnv": "ATLAS_LOAD_METRICS_TOKEN"
+  },
+  "resources": {
+    "symbol": "THYAO",
+    "scannerRunId": "replace-with-primary-user-run-id",
+    "watchlistId": "replace-with-primary-user-watchlist-id",
+    "portfolioId": "replace-with-primary-user-portfolio-id",
+    "backtestId": "replace-with-primary-user-backtest-id"
+  },
+  "readRequests": [
+    { "id": "marketOverview", "path": "/api/v1/market/overview" },
+    { "id": "symbolDetail", "path": "/api/v1/symbols/{symbol}" },
+    {
+      "id": "symbolChart",
+      "path": "/api/v1/symbols/{symbol}/chart?timeframe=1d&limit=730&adjustmentMode=raw"
+    },
+    {
+      "id": "scannerResults",
+      "path": "/api/v1/scanner/runs/{scannerRunId}/results?limit=50"
+    },
+    {
+      "id": "watchlistMarketSummary",
+      "path": "/api/v1/watchlists/{watchlistId}/market-summary?limit=50"
+    },
+    {
+      "id": "portfolioPositions",
+      "path": "/api/v1/portfolios/{portfolioId}/positions?limit=50"
+    },
+    {
+      "id": "backtestSummary",
+      "path": "/api/v1/backtests/{backtestId}/summary"
+    },
+    {
+      "id": "backtestTrades",
+      "path": "/api/v1/backtests/{backtestId}/trades?limit=100"
+    }
+  ],
+  "ownershipChecks": [
+    {
+      "id": "scanner-cross-user",
+      "path": "/api/v1/scanner/runs/{scannerRunId}/results?limit=1",
+      "token": "secondary"
+    },
+    {
+      "id": "watchlist-cross-user",
+      "path": "/api/v1/watchlists/{watchlistId}/market-summary?limit=1",
+      "token": "secondary"
+    },
+    {
+      "id": "portfolio-cross-user",
+      "path": "/api/v1/portfolios/{portfolioId}/positions?limit=1",
+      "token": "secondary"
+    },
+    {
+      "id": "backtest-cross-user",
+      "path": "/api/v1/backtests/{backtestId}/summary",
+      "token": "secondary"
+    }
+  ],
+  "mixedRequests": [
+    {
+      "id": "scannerCreate",
+      "method": "POST",
+      "path": "/api/v1/scanner/runs",
+      "bodyEnv": "ATLAS_LOAD_SCANNER_PAYLOAD"
+    },
+    {
+      "id": "alertEvaluation",
+      "method": "POST",
+      "urlEnv": "ATLAS_LOAD_ALERT_EVALUATION_URL",
+      "bodyEnv": "ATLAS_LOAD_ALERT_PAYLOAD",
+      "token": "operations"
+    },
+    {
+      "id": "portfolioRecalculate",
+      "method": "POST",
+      "path": "/api/v1/portfolios/{portfolioId}/recalculate",
+      "bodyEnv": "ATLAS_LOAD_RECALCULATE_PAYLOAD"
+    },
+    {
+      "id": "backtestCreate",
+      "method": "POST",
+      "path": "/api/v1/backtests",
+      "bodyEnv": "ATLAS_LOAD_BACKTEST_PAYLOAD"
+    },
+    {
+      "id": "experimentCreate",
+      "method": "POST",
+      "path": "/api/v1/experiments",
+      "bodyEnv": "ATLAS_LOAD_EXPERIMENT_PAYLOAD"
+    }
+  ],
+  "diagnostics": {
+    "snapshotUrl": "https://ops.staging.atlas.example/resilience/snapshot",
+    "tokenEnv": "ATLAS_LOAD_OPERATIONS_TOKEN"
+  }
+}
