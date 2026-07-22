@@ -34,6 +34,8 @@ export function OperationsWorkspace() {
   const [confirmation, setConfirmation] = useState('');
   const [bannerMessage, setBannerMessage] = useState('');
   const [bannerConfirmation, setBannerConfirmation] = useState('');
+  const [queueConfirmation, setQueueConfirmation] = useState('');
+  const [rolloutPercentage, setRolloutPercentage] = useState(10);
   const mutation = useMutation({
     mutationFn: async ({
       flag,
@@ -71,6 +73,32 @@ export function OperationsWorkspace() {
       setBannerConfirmation('');
       await queryClient.invalidateQueries({ queryKey: ['admin'] });
     },
+  });
+  const queueMutation = useMutation({
+    mutationFn: (queue: { name: string; paused: boolean }) =>
+      adminOperationsApi.setQueuePaused(queue.name, !queue.paused, {
+        confirmation: queueConfirmation,
+        expectedVersion: Number(queue.paused),
+        reason,
+      }),
+    onSuccess: async () => {
+      setQueueConfirmation('');
+      await queryClient.invalidateQueries({ queryKey: ['admin'] });
+    },
+  });
+  const rolloutMutation = useMutation({
+    mutationFn: async (flag: AdminFlag) => {
+      const history = await adminOperationsApi.history(flag.key);
+      return adminOperationsApi.setFlagVersion(flag.key, {
+        confirmation: 'CONFIRM_OPERATIONAL_CHANGE',
+        enabled: rolloutPercentage > 0,
+        environment: 'staging',
+        expectedVersion: history.versions[0]?.version ?? 0,
+        reason,
+        rolloutPercentage,
+      });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin'] }),
   });
 
   return (
@@ -127,6 +155,14 @@ export function OperationsWorkspace() {
 
             <section aria-labelledby="queues" className="admin-section">
               <h2 id="queues">Queue status</h2>
+              <label>
+                Queue confirmation
+                <input
+                  value={queueConfirmation}
+                  onChange={(event) => setQueueConfirmation(event.target.value)}
+                  placeholder="PAUSE_SCANNER_QUEUE"
+                />
+              </label>
               <div
                 className="admin-table"
                 role="table"
@@ -140,6 +176,13 @@ export function OperationsWorkspace() {
                     </span>
                     <span role="cell">Waiting {queue.counts.waiting ?? 0}</span>
                     <span role="cell">Failed {queue.counts.failed ?? 0}</span>
+                    <button
+                      disabled={queueMutation.isPending}
+                      onClick={() => queueMutation.mutate(queue)}
+                      type="button"
+                    >
+                      {queue.paused ? 'Resume queue' : 'Pause queue'}
+                    </button>
                   </div>
                 ))}
               </div>
@@ -208,12 +251,37 @@ export function OperationsWorkspace() {
                   </div>
                 ))}
               </div>
+              <label>
+                Rollout percentage
+                <input
+                  aria-label="Rollout percentage"
+                  max={100}
+                  min={0}
+                  onChange={(event) =>
+                    setRolloutPercentage(Number(event.target.value))
+                  }
+                  type="number"
+                  value={rolloutPercentage}
+                />
+              </label>
+              {flags.data.items
+                .filter((flag) => flag.flagType === 'release')
+                .map((flag) => (
+                  <button
+                    disabled={rolloutMutation.isPending}
+                    key={flag.key}
+                    onClick={() => rolloutMutation.mutate(flag)}
+                    type="button"
+                  >
+                    Update {flag.key} rollout
+                  </button>
+                ))}
               {flags.data.expired.length > 0 && (
                 <p className="admin-warning" role="alert">
                   {flags.data.expired.length} expired flag requires review.
                 </p>
               )}
-              {mutation.isError && (
+              {(mutation.isError || rolloutMutation.isError) && (
                 <p className="admin-warning" role="alert">
                   Operational change rejected.
                 </p>
@@ -227,6 +295,18 @@ export function OperationsWorkspace() {
               <div>
                 <h2 id="recovery">Recovery drill status</h2>
                 <p>{overview.data.recovery.length} drill record visible.</p>
+              </div>
+              <div>
+                <h2>Release status</h2>
+                <p>{overview.data.releases.length} release record visible.</p>
+              </div>
+              <div>
+                <h2>Incident timeline</h2>
+                <p>{overview.data.incidents.length} incident record visible.</p>
+              </div>
+              <div>
+                <h2>Operational audit</h2>
+                <p>{overview.data.audit.length} recent audit record visible.</p>
               </div>
               <div>
                 <h2>Data freshness</h2>

@@ -12,6 +12,7 @@ export interface AdminFlag {
 }
 
 export interface AdminOverview {
+  readonly audit: readonly Record<string, unknown>[];
   readonly backup: Record<string, unknown> | null;
   readonly dataFreshness?: {
     readonly latest_closed_bar_at: string | null;
@@ -58,6 +59,30 @@ export const adminOperationsApi = {
         version: number;
       }[];
     }>(`/admin/feature-flags/${encodeURIComponent(key)}/history`),
+  setFlagVersion: (
+    key: string,
+    input: {
+      enabled: boolean;
+      environment: 'staging';
+      rolloutPercentage: number;
+      reason: string;
+      expectedVersion: number;
+      confirmation: 'CONFIRM_OPERATIONAL_CHANGE';
+    },
+  ) =>
+    request(`/admin/feature-flags/${encodeURIComponent(key)}/versions`, {
+      body: JSON.stringify(input),
+      method: 'POST',
+    }),
+  setQueuePaused: (
+    queue: string,
+    paused: boolean,
+    input: { reason: string; expectedVersion: number; confirmation: string },
+  ) =>
+    request(
+      `/admin/operations/queues/${encodeURIComponent(queue)}/${paused ? 'pause' : 'resume'}`,
+      { body: JSON.stringify(input), method: 'POST' },
+    ),
   setSwitch: (
     key: string,
     enabled: boolean,

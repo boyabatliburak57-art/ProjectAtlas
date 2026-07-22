@@ -11,12 +11,18 @@ async function runFromEnvironment() {
   const portfolioId = required('SYNTHETIC_PORTFOLIO_ID');
   const scannerPayload = JSON.parse(required('SYNTHETIC_SCANNER_PAYLOAD'));
   const backtestPayload = JSON.parse(required('SYNTHETIC_BACKTEST_PAYLOAD'));
+  const experimentPayload = JSON.parse(
+    required('SYNTHETIC_EXPERIMENT_PAYLOAD'),
+  );
+  const adminToken = required('SYNTHETIC_ADMIN_BEARER_TOKEN');
   await runChecks({
+    adminToken,
     baseUrl,
     token,
     portfolioId,
     scannerPayload,
     backtestPayload,
+    experimentPayload,
   });
 }
 
@@ -31,6 +37,10 @@ async function runChecks(input) {
   await check('market-overview', `${input.baseUrl}/api/v1/market/overview`, {
     headers,
   });
+  await check('watchlist-list', `${input.baseUrl}/api/v1/watchlists`, {
+    headers,
+  });
+  await check('alert-list', `${input.baseUrl}/api/v1/alerts`, { headers });
   const scan = await check(
     'scanner-create',
     `${input.baseUrl}/api/v1/scanner/runs`,
@@ -72,8 +82,31 @@ async function runChecks(input) {
     `${input.baseUrl}/api/v1/backtests/${resourceId(backtest)}`,
     { headers },
   );
+  const experiment = await check(
+    'experiment-create',
+    `${input.baseUrl}/api/v1/experiments`,
+    {
+      method: 'POST',
+      headers: {
+        ...headers,
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      body: JSON.stringify(input.experimentPayload),
+    },
+  );
+  await check(
+    'experiment-status',
+    `${input.baseUrl}/api/v1/experiments/${resourceId(experiment)}`,
+    { headers },
+  );
+  await check(
+    'admin-operations-access',
+    `${input.baseUrl}/api/v1/admin/operations/overview`,
+    { headers: { authorization: `Bearer ${input.adminToken}` } },
+  );
   process.stdout.write(
-    'Staging synthetic journeys passed (8 journeys, 10 HTTP checks).\n',
+    'Staging synthetic journeys passed (8 journeys, 15 HTTP checks).\n',
   );
 }
 
@@ -108,7 +141,9 @@ async function selfTest() {
       ? { data: { id: 'scan-synthetic-id' } }
       : request.url === '/api/v1/backtests'
         ? { data: { id: 'backtest-synthetic-id' } }
-        : { data: { status: 'ok' } };
+        : request.url === '/api/v1/experiments'
+          ? { data: { id: 'experiment-synthetic-id' } }
+          : { data: { status: 'ok' } };
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(JSON.stringify(body));
   });
@@ -118,11 +153,13 @@ async function selfTest() {
     throw new Error('Synthetic self-test server did not bind');
   try {
     await runChecks({
+      adminToken: 'self-test-admin-token-not-logged',
       baseUrl: `http://127.0.0.1:${address.port}`,
       token: 'self-test-token-not-logged',
       portfolioId: 'portfolio-synthetic-id',
       scannerPayload: { fixture: true },
       backtestPayload: { fixture: true },
+      experimentPayload: { fixture: true },
     });
   } finally {
     await new Promise((resolve, reject) =>

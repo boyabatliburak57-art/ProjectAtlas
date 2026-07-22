@@ -54,7 +54,7 @@ export class AdminOperationsService {
   }
 
   async overview() {
-    const [queues, releases, incidentRows, drills, backup, freshness] =
+    const [queues, releases, incidentRows, drills, backup, freshness, audit] =
       await Promise.all([
         this.queues(),
         this.connection.database
@@ -74,9 +74,15 @@ export class AdminOperationsService {
           .orderBy(desc(backupStatusChecks.checkedAt))
           .limit(1),
         this.dataFreshness(),
+        this.connection.database
+          .select()
+          .from(operationalAuditEvents)
+          .orderBy(desc(operationalAuditEvents.createdAt))
+          .limit(20),
       ]);
     return {
       backup: backup[0] ?? null,
+      audit,
       dataFreshness: freshness,
       incidents: incidentRows,
       queues,

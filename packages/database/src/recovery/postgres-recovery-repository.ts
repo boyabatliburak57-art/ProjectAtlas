@@ -1,6 +1,7 @@
 import type {
   AccountDeletionRepository,
   AccountDeletionRequest,
+  LegalHoldRepository,
   RetentionCandidate,
   RetentionCategory,
   RetentionRepository,
@@ -31,7 +32,7 @@ export interface ArtifactDeletionPort {
 }
 
 export class PostgresRecoveryRepository
-  implements RetentionRepository, AccountDeletionRepository
+  implements RetentionRepository, AccountDeletionRepository, LegalHoldRepository
 {
   constructor(
     private readonly pool: Pool,
@@ -101,17 +102,7 @@ export class PostgresRecoveryRepository
   }
 
   async isHeld(candidate: RetentionCandidate, now: Date): Promise<boolean> {
-    const result = await this.pool.query(
-      `select 1 from legal_holds
-       where status = 'active'
-         and starts_at <= $1
-         and (expires_at is null or expires_at > $1)
-         and ((scope_type = $2 and scope_id = $3)
-           or (scope_type = 'user' and scope_id = $4))
-       limit 1`,
-      [now, candidate.category, candidate.id, candidate.ownerUserId ?? ''],
-    );
-    return result.rowCount === 1;
+    return candidateIsHeld(this.pool, candidate, now);
   }
 
   async deleteCandidate(
@@ -121,6 +112,10 @@ export class PostgresRecoveryRepository
     const client = await this.pool.connect();
     try {
       await client.query('begin');
+      if (await candidateIsHeld(client, candidate, now)) {
+        await client.query('commit');
+        return false;
+      }
       const deleted = await deleteRetentionCandidate(client, candidate, now);
       await client.query('commit');
       return deleted;
@@ -184,6 +179,47 @@ export class PostgresRecoveryRepository
         input.occurredAt,
       ],
     );
+  }
+
+  async createLegalHold(input: {
+    readonly actorUserId: string;
+    readonly expiresAt?: Date;
+    readonly reason: string;
+    readonly scopeId: string;
+    readonly scopeType: string;
+    readonly startsAt: Date;
+  }): Promise<{ readonly id: string }> {
+    const result = await this.pool.query<{ id: string }>(
+      `insert into legal_holds
+        (scope_type, scope_id, reason, status, starts_at, expires_at, created_by)
+       values ($1, $2, $3, 'active', $4, $5, $6)
+       returning id`,
+      [
+        input.scopeType,
+        input.scopeId,
+        input.reason,
+        input.startsAt,
+        input.expiresAt ?? null,
+        input.actorUserId,
+      ],
+    );
+    return result.rows[0]!;
+  }
+
+  async releaseLegalHold(input: {
+    readonly actorUserId: string;
+    readonly holdId: string;
+    readonly reason: string;
+    readonly releasedAt: Date;
+  }): Promise<boolean> {
+    const result = await this.pool.query(
+      `update legal_holds
+       set status = 'released', released_at = $2, released_by = $3,
+           reason = reason || E'\nRelease: ' || $4
+       where id = $1 and status = 'active'`,
+      [input.holdId, input.releasedAt, input.actorUserId, input.reason],
+    );
+    return result.rowCount === 1;
   }
 
   async findByIdempotencyKey(
@@ -344,6 +380,28 @@ export class PostgresRecoveryRepository
       [requestId, errorCode],
     );
   }
+}
+
+async function candidateIsHeld(
+  client: Pick<PoolClient, 'query'>,
+  candidate: RetentionCandidate,
+  now: Date,
+): Promise<boolean> {
+  const resourceTypes = [candidate.category, 'resource'];
+  if (candidate.category === 'scan_details') resourceTypes.push('run');
+  if (candidate.category === 'backtest_details') resourceTypes.push('run');
+  if (candidate.category === 'exports') resourceTypes.push('export');
+  const result = await client.query(
+    `select 1 from legal_holds
+     where status = 'active'
+       and starts_at <= $1
+       and (expires_at is null or expires_at > $1)
+       and ((scope_type = any($2::varchar[]) and scope_id = $3)
+         or (scope_type = 'user' and scope_id = $4))
+     limit 1`,
+    [now, resourceTypes, candidate.id, candidate.ownerUserId ?? ''],
+  );
+  return result.rowCount === 1;
 }
 
 function candidateStatement(category: RetentionCategory): string | null {

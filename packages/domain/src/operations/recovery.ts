@@ -43,6 +43,7 @@ export interface RetentionRunResult {
   readonly scannedCount: number;
   readonly skippedCount: number;
   readonly status: 'completed';
+  readonly dryRun?: boolean;
 }
 
 export interface RetentionRepository {
@@ -91,6 +92,7 @@ export class RetentionService {
     category: RetentionCategory,
     executionKey: string,
     now = new Date(),
+    options: { readonly dryRun?: boolean } = {},
   ): Promise<RetentionRunResult> {
     const policy = this.policies[category];
     if (executionKey.length < 8 || executionKey.length > 160)
@@ -119,8 +121,11 @@ export class RetentionService {
           skippedCount += 1;
           continue;
         }
-        if (await this.repository.deleteCandidate(candidate, now))
+        if (options.dryRun) {
           deletedCount += 1;
+        } else if (await this.repository.deleteCandidate(candidate, now))
+          deletedCount += 1;
+        else skippedCount += 1;
       }
       const result: RetentionRunResult = {
         deletedCount,
@@ -129,6 +134,7 @@ export class RetentionService {
         scannedCount: candidates.length,
         skippedCount,
         status: 'completed',
+        ...(options.dryRun ? { dryRun: true } : {}),
       };
       await this.repository.complete(result, now);
       await this.repository.audit({
@@ -142,6 +148,7 @@ export class RetentionService {
           scannedCount: result.scannedCount,
           skippedCount: result.skippedCount,
           status: result.status,
+          dryRun: options.dryRun === true,
         },
       });
       return result;
@@ -154,6 +161,100 @@ export class RetentionService {
       throw error;
     }
   }
+}
+
+export interface LegalHoldActor {
+  readonly isOperationsAdmin: boolean;
+  readonly userId: string;
+}
+
+export interface LegalHoldRepository {
+  createLegalHold(input: {
+    readonly actorUserId: string;
+    readonly expiresAt?: Date;
+    readonly reason: string;
+    readonly scopeId: string;
+    readonly scopeType: string;
+    readonly startsAt: Date;
+  }): Promise<{ readonly id: string }>;
+  releaseLegalHold(input: {
+    readonly actorUserId: string;
+    readonly holdId: string;
+    readonly reason: string;
+    readonly releasedAt: Date;
+  }): Promise<boolean>;
+  audit(input: {
+    readonly action: string;
+    readonly actorUserId?: string;
+    readonly resourceId: string;
+    readonly result: Readonly<Record<string, unknown>>;
+    readonly occurredAt: Date;
+  }): Promise<void>;
+}
+
+export class LegalHoldService {
+  constructor(private readonly repository: LegalHoldRepository) {}
+
+  async create(
+    actor: LegalHoldActor,
+    input: {
+      readonly expiresAt?: Date;
+      readonly reason: string;
+      readonly scopeId: string;
+      readonly scopeType: string;
+      readonly startsAt: Date;
+    },
+  ): Promise<{ readonly id: string }> {
+    authorizeLegalHold(actor, input.reason);
+    const hold = await this.repository.createLegalHold({
+      actorUserId: actor.userId,
+      ...input,
+    });
+    await this.repository.audit({
+      action: 'legal_hold.created',
+      actorUserId: actor.userId,
+      occurredAt: input.startsAt,
+      resourceId: hold.id,
+      result: {
+        expiresAt: input.expiresAt?.toISOString() ?? null,
+        scopeId: input.scopeId,
+        scopeType: input.scopeType,
+      },
+    });
+    return hold;
+  }
+
+  async release(
+    actor: LegalHoldActor,
+    holdId: string,
+    reason: string,
+    releasedAt = new Date(),
+  ): Promise<void> {
+    authorizeLegalHold(actor, reason);
+    if (
+      !(await this.repository.releaseLegalHold({
+        actorUserId: actor.userId,
+        holdId,
+        reason,
+        releasedAt,
+      }))
+    )
+      throw new RecoveryPolicyError('LEGAL_HOLD_NOT_ACTIVE');
+    await this.repository.audit({
+      action: 'legal_hold.released',
+      actorUserId: actor.userId,
+      occurredAt: releasedAt,
+      resourceId: holdId,
+      result: { reason },
+    });
+  }
+}
+
+function authorizeLegalHold(actor: LegalHoldActor, reason: string): void {
+  if (!actor.isOperationsAdmin)
+    throw new RecoveryPolicyError('LEGAL_HOLD_ADMIN_REQUIRED');
+  if (reason.trim().length < 8 || reason.length > 4096)
+    throw new RecoveryPolicyError('LEGAL_HOLD_REASON_INVALID');
 }
 
 export interface AccountDeletionRequest {

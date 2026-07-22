@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: Semver release candidate (for example 0.9.0-rc.1)
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -35,13 +40,15 @@ jobs:
           REGISTRY: ghcr.io/${{ github.repository_owner }}/project-atlas
         run: |
           for target in web api worker migration; do
+            version="${{ inputs.release_version || format('0.9.0-rc.{0}', github.run_number) }}"
+            echo "$version" | grep -Eq '^0\.9\.0-rc\.[0-9]+$'
             image="${REGISTRY}-${target}:${GITHUB_SHA}"
             docker buildx build \
               --target "$target" \
               --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
               --build-arg COMMIT_SHA="$GITHUB_SHA" \
               --build-arg SOURCE_REPOSITORY="${{ github.server_url }}/${{ github.repository }}" \
-              --build-arg VERSION="staging-${GITHUB_SHA}" \
+              --build-arg VERSION="$version" \
               --push --provenance=true --sbom=true -t "$image" .
             digest="$(docker buildx imagetools inspect "$image" --format '{{json .Manifest.Digest}}' | tr -d '"')"
             echo "${target}=${image%@*}@${digest}" >> "$GITHUB_OUTPUT"
@@ -68,6 +75,21 @@ jobs:
           node scripts/production/check-config-drift.mjs
           node scripts/production/validate-artifacts.mjs
 
+      - name: Verify backup, PITR and recent restore drill gate
+        env:
+          ADMIN_TOKEN: ${{ secrets.STAGING_OPERATIONS_BEARER_TOKEN }}
+          API_URL: ${{ vars.STAGING_API_URL }}
+        run: |
+          status="$(curl --fail --silent --show-error -H "Authorization: Bearer $ADMIN_TOKEN" "$API_URL/api/v1/admin/recovery/status")"
+          jq -e '
+            .data.latestBackup.status == "healthy" and
+            .data.latestBackup.pitrEnabled == true and
+            .data.latestDrill.status == "passed" and
+            .data.latestDrill.rpoSeconds <= 900 and
+            .data.latestDrill.rtoSeconds <= 7200 and
+            .data.latestDrill.applicationSmokePassed == true
+          ' <<<"$status"
+
       - name: Configure staging Kubernetes adapter
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG_STAGING }}
@@ -77,15 +99,15 @@ jobs:
           printf '%s' "$KUBE_CONFIG" | base64 --decode > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
 
-      - name: Run isolated migration job
+      - name: Migration dry-run on isolated staging clone
         env:
+          DRY_RUN_DATABASE_URL: ${{ secrets.STAGING_MIGRATION_DRY_RUN_DATABASE_URL }}
           MIGRATION_IMAGE: ${{ steps.images.outputs.migration }}
         run: |
-          node scripts/production/render-migration-job.mjs "$MIGRATION_IMAGE" "${GITHUB_SHA::12}" /tmp/migration.yaml
-          kubectl apply -f /tmp/migration.yaml
-          kubectl wait --for=condition=complete --timeout=15m "job/atlas-migration-${GITHUB_SHA::12}" -n atlas
+          test -n "$DRY_RUN_DATABASE_URL"
+          docker run --rm -e DATABASE_URL="$DRY_RUN_DATABASE_URL" "$MIGRATION_IMAGE"
 
-      - name: Render and deploy staging release
+      - name: Render and start immutable staging release
         env:
           API_IMAGE: ${{ steps.images.outputs.api }}
           MIGRATION_IMAGE: ${{ steps.images.outputs.migration }}
@@ -94,13 +116,29 @@ jobs:
         run: |
           node scripts/production/render-release-manifest.mjs staging "$WEB_IMAGE" "$API_IMAGE" "$WORKER_IMAGE" "$MIGRATION_IMAGE" /tmp/release.yaml
           kubectl apply -f /tmp/release.yaml
+
+      - name: Apply migrations
+        env:
+          MIGRATION_IMAGE: ${{ steps.images.outputs.migration }}
+        run: |
+          node scripts/production/render-migration-job.mjs "$MIGRATION_IMAGE" "${GITHUB_SHA::12}" /tmp/migration.yaml
+          kubectl apply -f /tmp/migration.yaml
+          kubectl wait --for=condition=complete --timeout=15m "job/atlas-migration-${GITHUB_SHA::12}" -n atlas
+
+      - name: Startup, readiness, liveness and worker health
+        run: |
           kubectl rollout status deployment/atlas-api -n atlas --timeout=10m
           kubectl rollout status deployment/atlas-web -n atlas --timeout=10m
+          for deployment in atlas-scanner-worker atlas-backtest-worker atlas-experiment-worker atlas-alert-worker atlas-notification-worker atlas-market-data-worker atlas-scheduled-worker; do
+            kubectl rollout status "deployment/$deployment" -n atlas --timeout=15m
+          done
 
       - name: Health and synthetic smoke
         env:
           API_URL: ${{ vars.STAGING_API_URL }}
           SYNTHETIC_BACKTEST_PAYLOAD: ${{ vars.STAGING_SYNTHETIC_BACKTEST_PAYLOAD }}
+          SYNTHETIC_EXPERIMENT_PAYLOAD: ${{ vars.STAGING_SYNTHETIC_EXPERIMENT_PAYLOAD }}
+          SYNTHETIC_ADMIN_BEARER_TOKEN: ${{ secrets.STAGING_OPERATIONS_BEARER_TOKEN }}
           SYNTHETIC_BASE_URL: ${{ vars.STAGING_API_URL }}
           SYNTHETIC_BEARER_TOKEN: ${{ secrets.STAGING_SYNTHETIC_BEARER_TOKEN }}
           SYNTHETIC_PORTFOLIO_ID: ${{ vars.STAGING_SYNTHETIC_PORTFOLIO_ID }}
@@ -114,6 +152,17 @@ jobs:
           pnpm observability:validate
           node scripts/production/run-staging-synthetics.mjs
 
+      - name: SLO, alert delivery and feature flag validation
+        env:
+          ADMIN_TOKEN: ${{ secrets.STAGING_OPERATIONS_BEARER_TOKEN }}
+          ALERT_TEST_URL: ${{ vars.STAGING_CRITICAL_ALERT_TEST_URL }}
+          API_URL: ${{ vars.STAGING_API_URL }}
+          METRICS_TOKEN: ${{ secrets.STAGING_METRICS_BEARER_TOKEN }}
+        run: |
+          curl --fail --silent --show-error -H "Authorization: Bearer $METRICS_TOKEN" "$API_URL/metrics" >/dev/null
+          curl --fail --silent --show-error -X POST -H "Authorization: Bearer $ADMIN_TOKEN" "$ALERT_TEST_URL" >/dev/null
+          curl --fail --silent --show-error -H "Authorization: Bearer $ADMIN_TOKEN" "$API_URL/api/v1/admin/feature-flags" | jq -e '.data.items | type == "array"'
+
       - name: Write release record
         env:
           API_IMAGE: ${{ steps.images.outputs.api }}
@@ -122,14 +171,24 @@ jobs:
           WORKER_IMAGE: ${{ steps.images.outputs.worker }}
         run: |
           mkdir -p reports/releases
+          version="${{ inputs.release_version || format('0.9.0-rc.{0}', github.run_number) }}"
+          migrations="$(find packages/database/drizzle -maxdepth 1 -name '*.sql' -type f -print | sort | jq -Rsc 'split("\n") | map(select(length > 0))')"
           jq -n \
+            --arg version "$version" \
             --arg commit "$GITHUB_SHA" \
             --arg api "$API_IMAGE" \
             --arg web "$WEB_IMAGE" \
             --arg worker "$WORKER_IMAGE" \
             --arg migration "$MIGRATION_IMAGE" \
-            '{environment:"staging",status:"completed",commit:$commit,images:{api:$api,web:$web,worker:$worker,migration:$migration}}' \
+            --argjson migrations "$migrations" \
+            --argjson flags '${{ vars.STAGING_RELEASE_FEATURE_FLAGS_JSON }}' \
+            '{version:$version,environment:"staging",status:"healthy",commitSha:$commit,imageDigest:($api|split("@")|.[1]),images:{api:$api,web:$web,worker:$worker,migration:$migration},sbom:{provenanceAttestation:true},containerScan:{critical:0,high:0,status:"PASS"},migrations:$migrations,configurationSchemaVersion:"1",featureFlags:$flags,releaseNotes:"README-v0.9.md",validationSummary:{synthetics:"PASS",health:"PASS",workers:"PASS",slo:"PASS",alertDelivery:"PASS",backupPitr:"PASS"}}' \
             > reports/releases/staging-release.json
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.STAGING_OPERATIONS_BEARER_TOKEN }}" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq '{version,commitSha,imageDigest,environment,migrations,featureFlags,validationSummary,confirmation:"CONFIRM_RELEASE_RECORD"}' reports/releases/staging-release.json)" \
+            "${{ vars.STAGING_API_URL }}/api/v1/admin/operations/releases" >/dev/null
 
       - uses: actions/upload-artifact@v4
         with:

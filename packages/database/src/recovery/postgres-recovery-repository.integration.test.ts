@@ -1,6 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 
-import { AccountDeletionService, RetentionService } from '@atlas/domain';
+import {
+  AccountDeletionService,
+  LegalHoldService,
+  RetentionService,
+} from '@atlas/domain';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createDatabase } from '../client';
@@ -54,7 +58,7 @@ describe('Postgres recovery application paths', () => {
       `insert into legal_holds
         (scope_type, scope_id, reason, status, starts_at, created_by)
        values ('notifications', $1, 'active investigation', 'active',
-               now() - interval '1 day', $2)`,
+               '2026-07-20T12:00:00Z', $2)`,
       [heldNotificationId, retainedUserId],
     );
   });
@@ -88,6 +92,207 @@ describe('Postgres recovery application paths', () => {
          and resource_id = 'task-076-notifications-2026-07-21'`,
     );
     expect(audit.rowCount).toBe(1);
+  });
+
+  it('allows expired holds to be purged on later runs', async () => {
+    const expiredId = await artifact('export', 'expired-hold');
+    await pool.query(
+      `insert into legal_holds
+        (scope_type, scope_id, reason, status, starts_at, expires_at, created_by)
+       values ('export', $1, 'expired investigation', 'active',
+               '2026-01-01T00:00:00Z', '2026-02-01T00:00:00Z', $2)`,
+      [expiredId, retainedUserId],
+    );
+    const now = new Date('2027-07-21T12:00:00.000Z');
+    await expect(
+      new RetentionService(repository).run('exports', 'expired-hold-run', now),
+    ).resolves.toMatchObject({ deletedCount: 1, skippedCount: 0 });
+  });
+
+  it('purges a record after its hold is explicitly released', async () => {
+    const releasedId = await artifact('import', 'released-hold');
+    const hold = await pool.query<{ id: string }>(
+      `insert into legal_holds
+        (scope_type, scope_id, reason, status, starts_at, created_by)
+       values ('import_files', $1, 'released investigation', 'active',
+               '2026-01-01T00:00:00Z', $2) returning id`,
+      [releasedId, retainedUserId],
+    );
+    await new LegalHoldService(repository).release(
+      { isOperationsAdmin: true, userId: retainedUserId },
+      hold.rows[0]!.id,
+      'investigation completed',
+      new Date('2026-02-01T00:00:00Z'),
+    );
+    await expect(
+      new RetentionService(repository).run(
+        'import_files',
+        'released-hold-run',
+        new Date('2027-07-21T12:00:00.000Z'),
+      ),
+    ).resolves.toMatchObject({ deletedCount: 1, skippedCount: 0 });
+  });
+
+  it('preserves hold checks at a batch boundary while deleting eligible peers', async () => {
+    const held = await artifact('export', 'batch-held');
+    await artifact('export', 'batch-delete');
+    await pool.query(
+      `insert into legal_holds
+        (scope_type, scope_id, reason, status, starts_at, created_by)
+       values ('resource', $1, 'batch boundary hold', 'active',
+               '2026-01-01T00:00:00Z', $2)`,
+      [held, retainedUserId],
+    );
+    const result = await new RetentionService(repository, 2).run(
+      'exports',
+      'batch-boundary-run',
+      new Date('2027-07-21T12:00:00.000Z'),
+    );
+    expect(result).toMatchObject({
+      deletedCount: 1,
+      scannedCount: 2,
+      skippedCount: 1,
+    });
+  });
+
+  it('supports resource, user, run and export hold scopes', async () => {
+    const candidate = {
+      category: 'backtest_details' as const,
+      id: randomUUID(),
+      ownerUserId: retainedUserId,
+    };
+    for (const [scopeType, scopeId] of [
+      ['resource', candidate.id],
+      ['run', candidate.id],
+      ['user', retainedUserId],
+    ]) {
+      const hold = await pool.query<{ id: string }>(
+        `insert into legal_holds
+          (scope_type, scope_id, reason, status, starts_at, created_by)
+         values ($1, $2, 'multi scope validation', 'active',
+                 '2026-01-01T00:00:00Z', $3) returning id`,
+        [scopeType, scopeId, retainedUserId],
+      );
+      await expect(
+        repository.isHeld(candidate, new Date('2026-07-21T12:00:00Z')),
+      ).resolves.toBe(true);
+      await pool.query('delete from legal_holds where id = $1', [
+        hold.rows[0]!.id,
+      ]);
+    }
+    const exportId = await artifact('export', 'typed-export');
+    await pool.query(
+      `insert into legal_holds
+        (scope_type, scope_id, reason, status, starts_at, created_by)
+       values ('export', $1, 'typed export validation', 'active',
+               '2026-01-01T00:00:00Z', $2)`,
+      [exportId, retainedUserId],
+    );
+    await expect(
+      repository.isHeld(
+        { category: 'exports', id: exportId, ownerUserId: retainedUserId },
+        new Date('2026-07-21T12:00:00Z'),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it('dry-runs without deleting and records the simulated audit result', async () => {
+    const id = await artifact('import', 'dry-run');
+    const result = await new RetentionService(repository).run(
+      'import_files',
+      'retention-dry-run',
+      new Date('2027-07-21T12:00:00Z'),
+      { dryRun: true },
+    );
+    expect(result).toMatchObject({ deletedCount: 1, dryRun: true });
+    await expect(
+      pool.query('select 1 from stored_artifacts where id = $1', [id]),
+    ).resolves.toHaveProperty('rowCount', 1);
+    const audit = await pool.query<{ dry_run: boolean }>(
+      `select (after_state ->> 'dryRun')::boolean dry_run
+       from operational_audit_events where resource_id = 'retention-dry-run'`,
+    );
+    expect(audit.rows[0]?.dry_run).toBe(true);
+  });
+
+  it('rechecks a concurrently activated hold inside the delete transaction', async () => {
+    const id = await artifact('export', 'concurrent-hold');
+    const candidate = {
+      category: 'exports' as const,
+      id,
+      ownerUserId: retainedUserId,
+    };
+    const now = new Date('2027-07-21T12:00:00Z');
+    await expect(repository.isHeld(candidate, now)).resolves.toBe(false);
+    await pool.query(
+      `insert into legal_holds
+        (scope_type, scope_id, reason, status, starts_at, created_by)
+       values ('export', $1, 'concurrent activation', 'active', $2, $3)`,
+      [id, now, retainedUserId],
+    );
+    await expect(repository.deleteCandidate(candidate, now)).resolves.toBe(
+      false,
+    );
+    await expect(
+      pool.query('select 1 from stored_artifacts where id = $1', [id]),
+    ).resolves.toHaveProperty('rowCount', 1);
+  });
+
+  it('resumes batch processing with a new execution key without duplicates', async () => {
+    await pool.query(
+      `delete from stored_artifacts where artifact_type = 'import'
+       and object_key like 'task-080r/%'`,
+    );
+    await artifact('import', 'resume-one');
+    await artifact('import', 'resume-two');
+    const service = new RetentionService(repository, 1);
+    const now = new Date('2027-07-21T12:00:00Z');
+    const first = await service.run('import_files', 'resume-page-one', now);
+    const second = await service.run('import_files', 'resume-page-two', now);
+    expect([first.deletedCount, second.deletedCount]).toEqual([1, 1]);
+    await expect(
+      service.run('import_files', 'resume-page-two', now),
+    ).resolves.toEqual(second);
+  });
+
+  it('requires an operations admin and reason for hold changes and audits both actions', async () => {
+    const service = new LegalHoldService(repository);
+    const now = new Date('2026-07-21T12:00:00Z');
+    await expect(
+      service.create(
+        { isOperationsAdmin: false, userId: retainedUserId },
+        {
+          reason: 'unauthorized hold request',
+          scopeId: retainedUserId,
+          scopeType: 'user',
+          startsAt: now,
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'LEGAL_HOLD_ADMIN_REQUIRED' });
+    const hold = await service.create(
+      { isOperationsAdmin: true, userId: retainedUserId },
+      {
+        reason: 'authorized investigation hold',
+        scopeId: retainedUserId,
+        scopeType: 'user',
+        startsAt: now,
+      },
+    );
+    await service.release(
+      { isOperationsAdmin: true, userId: retainedUserId },
+      hold.id,
+      'investigation completed',
+      new Date('2026-07-22T12:00:00Z'),
+    );
+    const audit = await pool.query<{ action: string }>(
+      `select action from operational_audit_events where resource_id = $1
+       order by created_at`,
+      [hold.id],
+    );
+    expect(audit.rows.map((row) => row.action)).toEqual([
+      'legal_hold.created',
+      'legal_hold.released',
+    ]);
   });
 
   it('purges expired incident timelines only through the audited retention context', async () => {
@@ -222,4 +427,19 @@ describe('Postgres recovery application paths', () => {
       ),
     ).toHaveProperty('rowCount', 0);
   });
+
+  async function artifact(
+    type: 'export' | 'import',
+    suffix: string,
+  ): Promise<string> {
+    const result = await pool.query<{ id: string }>(
+      `insert into stored_artifacts
+        (owner_user_id, artifact_type, object_key, version, checksum_sha256,
+         encryption_key_reference, byte_size, status, retention_until, created_at)
+       values ($1, $2, $3, 1, $4, 'kms://atlas/task-080r', 1, 'active',
+               '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z') returning id`,
+      [retainedUserId, type, `task-080r/${suffix}`, 'd'.repeat(64)],
+    );
+    return result.rows[0]!.id;
+  }
 });

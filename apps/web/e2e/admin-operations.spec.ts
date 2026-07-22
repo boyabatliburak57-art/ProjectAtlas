@@ -18,6 +18,7 @@ test('operations admin sees platform state and submits an audited kill switch co
       contentType: 'application/json',
       body: JSON.stringify({
         data: {
+          audit: [{ action: 'release.create' }],
           backup: { status: 'healthy' },
           incidents: [],
           queues: [
@@ -84,6 +85,96 @@ test('operations admin sees platform state and submits an audited kill switch co
     });
   await page.keyboard.press('Tab');
   await expect(page.locator(':focus')).toBeVisible();
+});
+
+test('queue control, percentage rollout and version conflict remain explicit', async ({
+  page,
+}) => {
+  let queueCommand: Record<string, unknown> | undefined;
+  let rolloutCommand: Record<string, unknown> | undefined;
+  await page.route('**/api/v1/admin/operations/overview', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: {
+          audit: [],
+          backup: { status: 'healthy' },
+          dataFreshness: {},
+          incidents: [{ status: 'mitigating' }],
+          queues: [
+            {
+              counts: { failed: 1, waiting: 0 },
+              name: 'scanner',
+              paused: false,
+            },
+          ],
+          recovery: [{ status: 'passed' }],
+          releases: [{ status: 'healthy', version: '0.9.0-rc.1' }],
+        },
+      }),
+    }),
+  );
+  await page.route('**/api/v1/admin/feature-flags', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: {
+          expired: [],
+          items: [
+            { ...flag, flagType: 'release', key: 'release.strategy-lab' },
+          ],
+        },
+      }),
+    }),
+  );
+  await page.route('**/api/v1/admin/feature-flags/*/history', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ data: { flag, versions: [{ version: 7 }] } }),
+    }),
+  );
+  await page.route(
+    '**/api/v1/admin/operations/queues/scanner/pause',
+    async (route) => {
+      queueCommand = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ data: {} }),
+      });
+    },
+  );
+  await page.route(
+    '**/api/v1/admin/feature-flags/*/versions',
+    async (route) => {
+      rolloutCommand = route.request().postDataJSON() as Record<
+        string,
+        unknown
+      >;
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: { code: 'FEATURE_FLAG_VERSION_CONFLICT' },
+        }),
+      });
+    },
+  );
+
+  await page.goto('/admin/operations');
+  await page.getByLabel('Queue confirmation').fill('PAUSE_SCANNER_QUEUE');
+  await page.getByRole('button', { name: 'Pause queue' }).click();
+  await expect.poll(() => queueCommand).toMatchObject({ expectedVersion: 0 });
+  await page.getByLabel('Rollout percentage').fill('25');
+  await page.getByRole('button', { name: /Update .* rollout/ }).click();
+  await expect
+    .poll(() => rolloutCommand)
+    .toMatchObject({
+      expectedVersion: 7,
+      rolloutPercentage: 25,
+    });
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'Operational change rejected' }),
+  ).toContainText('Operational change rejected');
 });
 
 test('non-admin receives a safe denied state without operational data', async ({
